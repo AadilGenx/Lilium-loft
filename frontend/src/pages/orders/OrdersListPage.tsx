@@ -45,6 +45,8 @@ export function OrdersListPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  // Same rolling window the dashboard uses, so the two can be compared directly.
+  const [period, setPeriod] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
@@ -72,9 +74,24 @@ export function OrdersListPage() {
       const matchesStatus =
         selectedStatus === 'all' || o.status === selectedStatus;
 
-      return matchesSearch && matchesStatus;
+      const matchesPeriod =
+        period === 'all' || new Date(o.dateCreated).getTime() >= Date.now() - Number(period) * 86_400_000;
+
+      return matchesSearch && matchesStatus && matchesPeriod;
     });
-  }, [orders, searchTerm, selectedStatus]);
+  }, [orders, searchTerm, selectedStatus, period]);
+
+  // What the list adds up to, and how much of it the dashboard counts as sales
+  // (processing + completed orders, after refunds). Only shown when every order is in one currency.
+  const totals = useMemo(() => {
+    const currencies = new Set(filteredOrders.map((o) => o.currency));
+    if (filteredOrders.length === 0 || currencies.size !== 1) return null;
+    const listed = filteredOrders.reduce((sum, o) => sum + o.total, 0);
+    const counted = filteredOrders
+      .filter((o) => o.status === 'processing' || o.status === 'completed')
+      .reduce((sum, o) => sum + o.total - o.refundedTotal, 0);
+    return { currency: filteredOrders[0].currency, listed, counted };
+  }, [filteredOrders]);
 
   const totalPages = Math.ceil(filteredOrders.length / pageSize);
   const paginatedOrders = filteredOrders.slice(
@@ -113,6 +130,8 @@ export function OrdersListPage() {
         Date: o.dateCreated,
         ItemsCount: o.items.length,
         Total: o.total,
+        Currency: o.currency,
+        DatePaid: o.datePaid ?? '',
         PaymentMethod: o.paymentMethodTitle,
         TransactionID: o.transactionId,
       })),
@@ -221,9 +240,47 @@ export function OrdersListPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="w-full sm:w-44">
+              <Select
+                value={period}
+                onValueChange={(val) => {
+                  setPeriod(val);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="bg-slate-50/50">
+                  <SelectValue placeholder="Period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All time</SelectItem>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* What the current list adds up to */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-xs text-slate-500">
+        <span>
+          <strong className="text-slate-800">{filteredOrders.length}</strong>{' '}
+          {filteredOrders.length === 1 ? 'order' : 'orders'}
+          {totals && (
+            <>
+              {' '}· total <strong className="text-slate-800">{formatCurrency(totals.listed, totals.currency)}</strong>
+            </>
+          )}
+        </span>
+        {totals && (
+          <span>
+            Counted as sales (processing + completed, after refunds):{' '}
+            <strong className="text-slate-800">{formatCurrency(totals.counted, totals.currency)}</strong>
+          </span>
+        )}
+      </div>
 
       {/* Orders Table */}
       <Card>

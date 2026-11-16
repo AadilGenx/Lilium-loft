@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Boxes,
   Search,
@@ -44,15 +45,28 @@ import { useProductStore } from '@/store';
 import { Product } from '@/types';
 import { formatMoney } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
-import { stockState } from '@/utils/stock';
+import { useStockState } from '@/hooks/useStockState';
 import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function InventoryPage() {
+  const stockOf = useStockState();
   const { products, adjustStock } = useProductStore();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterTab, setFilterTab] = useState<'all' | 'low' | 'out' | 'in'>('all');
+  // Opened from the stock-alert button (/inventory?filter=alerts): start on the products that need attention.
+  const [searchParams] = useSearchParams();
+  const [filterTab, setFilterTab] = useState<'all' | 'alerts' | 'low' | 'out' | 'in'>(
+    searchParams.get('filter') === 'alerts' ? 'alerts' : 'all'
+  );
+  const filterParam = searchParams.get('filter');
+  useEffect(() => {
+    // Clicking the alert button again while already on this page switches back to the alerts view.
+    if (filterParam === 'alerts') {
+      setFilterTab('alerts');
+      setCurrentPage(1);
+    }
+  }, [filterParam]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8;
 
@@ -66,11 +80,11 @@ export function InventoryPage() {
   const counts = useMemo(() => {
     return {
       total: products.length,
-      inStock: products.filter((p) => stockState(p) === 'in').length,
-      lowStock: products.filter((p) => stockState(p) === 'low').length,
-      outOfStock: products.filter((p) => stockState(p) === 'out').length,
+      inStock: products.filter((p) => stockOf(p) === 'in').length,
+      lowStock: products.filter((p) => stockOf(p) === 'low').length,
+      outOfStock: products.filter((p) => stockOf(p) === 'out').length,
     };
-  }, [products]);
+  }, [products, stockOf]);
 
   // Filtered inventory list
   const filteredProducts = useMemo(() => {
@@ -80,13 +94,14 @@ export function InventoryPage() {
         p.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
       let matchesTab = true;
-      if (filterTab === 'low') matchesTab = stockState(p) === 'low';
-      if (filterTab === 'out') matchesTab = stockState(p) === 'out';
-      if (filterTab === 'in') matchesTab = stockState(p) === 'in';
+      if (filterTab === 'alerts') matchesTab = stockOf(p) === 'low' || stockOf(p) === 'out';
+      if (filterTab === 'low') matchesTab = stockOf(p) === 'low';
+      if (filterTab === 'out') matchesTab = stockOf(p) === 'out';
+      if (filterTab === 'in') matchesTab = stockOf(p) === 'in';
 
       return matchesSearch && matchesTab;
     });
-  }, [products, searchTerm, filterTab]);
+  }, [products, searchTerm, filterTab, stockOf]);
 
   const totalPages = Math.ceil(filteredProducts.length / pageSize);
   const paginatedProducts = filteredProducts.slice(
@@ -149,7 +164,7 @@ export function InventoryPage() {
             Inventory & Stock Control
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Audit inventory levels, track replenishment thresholds, and make quick stock adjustments.
+            Stock levels as WooCommerce reports them, with quick stock adjustments.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
@@ -179,7 +194,7 @@ export function InventoryPage() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Tracked Items
+                All Products
               </span>
               <div className="text-2xl font-bold text-slate-900 mt-1">
                 {counts.total}
@@ -203,7 +218,7 @@ export function InventoryPage() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                In Stock (&gt;5)
+                In Stock
               </span>
               <div className="text-2xl font-bold text-emerald-600 mt-1">
                 {counts.inStock}
@@ -227,7 +242,7 @@ export function InventoryPage() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Low Stock (≤5)
+                Low Stock
               </span>
               <div className="text-2xl font-bold text-amber-600 mt-1">
                 {counts.lowStock}
@@ -251,7 +266,7 @@ export function InventoryPage() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Out of Stock (0)
+                Out of Stock
               </span>
               <div className="text-2xl font-bold text-red-600 mt-1">
                 {counts.outOfStock}
@@ -262,6 +277,38 @@ export function InventoryPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Which products to list: the ones that need attention, or everything */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          { key: 'alerts' as const, label: 'Needs attention', count: counts.lowStock + counts.outOfStock },
+          { key: 'all' as const, label: 'All products', count: counts.total },
+        ].map((tab) => {
+          const active = filterTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setFilterTab(tab.key);
+                setCurrentPage(1);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                active
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80'
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`px-1.5 rounded-full text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+        {(filterTab === 'low' || filterTab === 'out' || filterTab === 'in') && (
+          <span className="text-xs text-slate-400">Filtered by the stock card you selected above.</span>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -308,8 +355,8 @@ export function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {paginatedProducts.map((p) => {
-                  const isOut = stockState(p) === 'out';
-                  const isLow = stockState(p) === 'low';
+                  const isOut = stockOf(p) === 'out';
+                  const isLow = stockOf(p) === 'low';
                   return (
                     <TableRow key={p.id}>
                       <TableCell>
@@ -353,10 +400,12 @@ export function InventoryPage() {
                       <TableCell>
                         {isOut ? (
                           <Badge variant="destructive">Out of Stock</Badge>
+                        ) : stockOf(p) === 'backorder' ? (
+                          <Badge variant="warning">On Backorder</Badge>
                         ) : isLow ? (
-                          <Badge variant="warning">Low Stock Alert</Badge>
+                          <Badge variant="warning">Low Stock</Badge>
                         ) : (
-                          <Badge variant="success">Normal Stock</Badge>
+                          <Badge variant="success">In Stock</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

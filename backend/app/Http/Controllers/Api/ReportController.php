@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WooOrder;
 use App\Models\WooOrderItem;
 use App\Models\WooProduct;
+use App\Services\WooCommerce\StockRules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -42,6 +43,7 @@ class ReportController extends Controller
                     new OA\Property(property: 'orders', type: 'integer'),
                     new OA\Property(property: 'items_sold', type: 'integer'),
                     new OA\Property(property: 'gross_sales', type: 'number', format: 'float'),
+                    new OA\Property(property: 'refunds', type: 'number', format: 'float'),
                     new OA\Property(property: 'discounts', type: 'number', format: 'float'),
                     new OA\Property(property: 'shipping', type: 'number', format: 'float'),
                     new OA\Property(property: 'tax', type: 'number', format: 'float'),
@@ -75,7 +77,7 @@ class ReportController extends Controller
         };
 
         $rows = $this->orders($from, $to)
-            ->selectRaw("{$period} as period, COUNT(*) as orders, SUM(total) as gross, SUM(discount_total) as discounts, SUM(shipping_total) as shipping, SUM(total_tax) as tax")
+            ->selectRaw("{$period} as period, COUNT(*) as orders, SUM(total) as gross, SUM(refunded_total) as refund_sum, SUM(discount_total) as discount_sum, SUM(shipping_total) as ship_sum, SUM(total_tax) as tax_sum")
             ->groupBy('period')->get()->keyBy('period');
 
         $cursor = match ($groupBy) {
@@ -85,25 +87,30 @@ class ReportController extends Controller
         };
 
         $data = [];
-        $totals = ['orders' => 0, 'gross_sales' => 0.0, 'discounts' => 0.0, 'shipping' => 0.0, 'tax' => 0.0];
+        $totals = ['orders' => 0, 'gross_sales' => 0.0, 'refunds' => 0.0, 'discounts' => 0.0, 'shipping' => 0.0, 'tax' => 0.0];
         while ($cursor->lte($to)) {
             $key = $cursor->toDateString();
             $r = $rows[$key] ?? null;
             $gross = (float) ($r->gross ?? 0);
-            $ship = (float) ($r->shipping ?? 0);
-            $tax = (float) ($r->tax ?? 0);
+            // NOTE: these aliases must not match an attribute of the order model (it has `shipping` and `billing`
+            // address accessors), or the model would return the address instead of the summed amount.
+            $refunds = (float) ($r->refund_sum ?? 0);
+            $ship = (float) ($r->ship_sum ?? 0);
+            $tax = (float) ($r->tax_sum ?? 0);
             $data[] = [
                 'period' => $key,
                 'orders' => (int) ($r->orders ?? 0),
                 'gross_sales' => $gross,
-                'discounts' => (float) ($r->discounts ?? 0),
+                'refunds' => $refunds,
+                'discounts' => (float) ($r->discount_sum ?? 0),
                 'shipping' => $ship,
                 'tax' => $tax,
-                'net_sales' => round($gross - $ship - $tax, 2),
+                'net_sales' => round($gross - $refunds - $ship - $tax, 2),
             ];
             $totals['orders'] += (int) ($r->orders ?? 0);
             $totals['gross_sales'] += $gross;
-            $totals['discounts'] += (float) ($r->discounts ?? 0);
+            $totals['refunds'] += $refunds;
+            $totals['discounts'] += (float) ($r->discount_sum ?? 0);
             $totals['shipping'] += $ship;
             $totals['tax'] += $tax;
 
@@ -119,8 +126,9 @@ class ReportController extends Controller
             ->whereIn('woo_orders.status', self::PAID)
             ->whereBetween('woo_orders.woo_created_at', [$from, $to])
             ->sum('woo_order_items.quantity');
-        $totals['net_sales'] = round($totals['gross_sales'] - $totals['shipping'] - $totals['tax'], 2);
-        $totals['average_order_value'] = $totals['orders'] ? round($totals['gross_sales'] / $totals['orders'], 2) : 0;
+        $totals['net_sales'] = round($totals['gross_sales'] - $totals['refunds'] - $totals['shipping'] - $totals['tax'], 2);
+        // Average order value is what customers actually kept paying for: after refunds.
+        $totals['average_order_value'] = $totals['orders'] ? round(($totals['gross_sales'] - $totals['refunds']) / $totals['orders'], 2) : 0;
 
         return response()->json([
             'from' => $from->toDateString(),
@@ -250,7 +258,7 @@ class ReportController extends Controller
         $request->validate(['limit' => 'integer|min:1|max:100']);
 
         $rows = $this->orders($from, $to)->whereNotNull('billing_email')
-            ->selectRaw('billing_email, MIN(billing_name) as name, COUNT(*) as orders, SUM(total) as total_spent, MAX(woo_created_at) as last_order_at')
+            ->selectRaw('billing_email, MIN(billing_name) as name, COUNT(*) as orders, SUM(total - refunded_total) as total_spent, MAX(woo_created_at) as last_order_at')
             ->groupBy('billing_email')->orderByDesc('total_spent')
             ->limit((int) $request->input('limit', 20))->get()
             ->map(fn ($r) => [
@@ -318,12 +326,11 @@ class ReportController extends Controller
         security: [['bearerAuth' => []]],
         tags: ['Reports'],
         parameters: [
-            new OA\Parameter(name: 'threshold', in: 'query', description: 'Low-stock level; default from server settings', schema: new OA\Schema(type: 'integer', minimum: 0, maximum: 1000)),
             new OA\Parameter(name: 'limit', in: 'query', description: 'Maximum rows in each list', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 200, default: 100)),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'threshold', type: 'integer'),
+                new OA\Property(property: 'threshold', type: 'integer', nullable: true, description: 'The store-wide low-stock level from WooCommerce; null until it has been read during an import. Products can also have their own level.'),
                 new OA\Property(property: 'out_of_stock_count', type: 'integer'),
                 new OA\Property(property: 'low_stock_count', type: 'integer'),
                 new OA\Property(property: 'out_of_stock', type: 'array', items: new OA\Items(type: 'object')),
@@ -335,21 +342,20 @@ class ReportController extends Controller
     )]
     public function stock(Request $request): JsonResponse
     {
-        $request->validate(['threshold' => 'integer|min:0|max:1000', 'limit' => 'integer|min:1|max:200']);
-        $threshold = (int) $request->input('threshold', config('woocommerce.low_stock_threshold'));
+        $request->validate(['limit' => 'integer|min:1|max:200']);
         $limit = (int) $request->input('limit', 100);
         $fields = ['id', 'woo_id', 'name', 'sku', 'stock_quantity', 'stock_status'];
 
         $out = WooProduct::where('status', 'publish')->where('stock_status', 'outofstock');
-        $low = WooProduct::where('status', 'publish')->where('manage_stock', true)
-            ->where('stock_quantity', '>', 0)->where('stock_quantity', '<=', $threshold);
+        // "Low" follows WooCommerce's own rule (the product's level, else the store-wide one); see StockRules.
+        $low = StockRules::lowStockProducts();
 
         return response()->json([
-            'threshold' => $threshold,
+            'threshold' => StockRules::globalThreshold(),
             'out_of_stock_count' => (clone $out)->count(),
-            'low_stock_count' => (clone $low)->count(),
+            'low_stock_count' => $low->count(),
             'out_of_stock' => $out->orderBy('name')->limit($limit)->get($fields),
-            'low_stock' => $low->orderBy('stock_quantity')->limit($limit)->get($fields),
+            'low_stock' => $low->sortBy('stock_quantity')->take($limit)->map(fn ($p) => $p->only($fields))->values(),
         ]);
     }
 

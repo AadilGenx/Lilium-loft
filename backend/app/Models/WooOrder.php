@@ -19,6 +19,7 @@ class WooOrder extends Model
     {
         return [
             'total' => 'decimal:2',
+            'refunded_total' => 'decimal:2',
             'discount_total' => 'decimal:2',
             'shipping_total' => 'decimal:2',
             'total_tax' => 'decimal:2',

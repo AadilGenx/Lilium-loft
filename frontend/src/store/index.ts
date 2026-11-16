@@ -57,6 +57,26 @@ import {
 
 const readError = (err: unknown, fallback: string) => (err instanceof ApiError && err.message ? err.message : fallback);
 
+/** The biggest list we will load (pages of 100). Far beyond a normal store, but it stops a runaway loop. */
+const MAX_PAGES = 100;
+
+/**
+ * Loads EVERY page of a list, so counts and totals on screen describe the whole store
+ * and not just the first 100 records.
+ */
+async function fetchAllPages<T>(load: (page: number) => Promise<{ data: T[]; last_page: number }>): Promise<T[]> {
+  const all: T[] = [];
+  let page = 1;
+  let last = 1;
+  do {
+    const res = await load(page);
+    all.push(...(res.data ?? []));
+    last = res.last_page ?? 1;
+    page += 1;
+  } while (page <= last && page <= MAX_PAGES);
+  return all;
+}
+
 /** Options for the list loaders. `silent` is used by background updates: no loading flag, no error state. */
 export interface FetchOptions {
   silent?: boolean;
@@ -162,8 +182,8 @@ export const useProductStore = create<ProductStore>((set, get) => ({
   fetchProducts: async ({ silent = false } = {}) => {
     if (!silent) set({ isLoading: true, error: null });
     try {
-      const res = await productsApi.list({ per_page: 100 });
-      const products = keepUnchanged(get().products, (res.data ?? []).map(mapBackendProduct));
+      const rows = await fetchAllPages((page) => productsApi.list({ per_page: 100, page }));
+      const products = keepUnchanged(get().products, rows.map(mapBackendProduct));
       set(silent ? { products } : { products, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch products:', err);
@@ -234,10 +254,10 @@ export const useOrderStore = create<OrderStore>((set, get) => {
     fetchOrders: async ({ silent = false } = {}) => {
       if (!silent) set({ isLoading: true, error: null });
       try {
-        const res = await ordersApi.list({ per_page: 100, with_items: 1 });
+        const rows = await fetchAllPages((page) => ordersApi.list({ per_page: 100, with_items: 1, page }));
         // Notes and refunds are loaded per order; keep what is already loaded so a refresh does not blank them.
         const loaded = new Map(get().orders.map((o) => [o.id, o]));
-        const orders = (res.data ?? []).map(mapBackendOrder).map((o) => {
+        const orders = rows.map(mapBackendOrder).map((o) => {
           const prev = loaded.get(o.id);
           return prev ? { ...o, notes: prev.notes, refunds: prev.refunds } : o;
         });
@@ -336,8 +356,8 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
   fetchCustomers: async ({ silent = false } = {}) => {
     if (!silent) set({ isLoading: true, error: null });
     try {
-      const res = await customersApi.list({ per_page: 100 });
-      const customers = keepUnchanged(get().customers, (res.data ?? []).map(mapBackendCustomer));
+      const rows = await fetchAllPages((page) => customersApi.list({ per_page: 100, page }));
+      const customers = keepUnchanged(get().customers, rows.map(mapBackendCustomer));
       set(silent ? { customers } : { customers, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch customers:', err);
@@ -388,8 +408,8 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
   fetchCategories: async ({ silent = false } = {}) => {
     if (!silent) set({ isLoading: true, error: null });
     try {
-      const res = await categoriesApi.list(undefined, 100);
-      const categories = keepUnchanged(get().categories, (res.data ?? []).map(mapBackendCategory));
+      const rows = await fetchAllPages((page) => categoriesApi.list(undefined, 100, page));
+      const categories = keepUnchanged(get().categories, rows.map(mapBackendCategory));
       set(silent ? { categories } : { categories, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch categories:', err);
@@ -455,8 +475,8 @@ export const useCouponStore = create<CouponStore>((set, get) => ({
   fetchCoupons: async ({ silent = false } = {}) => {
     if (!silent) set({ isLoading: true, error: null });
     try {
-      const res = await couponsApi.list(undefined, 100);
-      const coupons = keepUnchanged(get().coupons, (res.data ?? []).map(mapBackendCoupon));
+      const rows = await fetchAllPages((page) => couponsApi.list(undefined, 100, page));
+      const coupons = keepUnchanged(get().coupons, rows.map(mapBackendCoupon));
       set(silent ? { coupons } : { coupons, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch coupons:', err);
@@ -712,9 +732,11 @@ export interface BackendSyncState {
   revenueHistory: BackendRevenuePoint[];
   topProducts: BackendTopProduct[];
   ordersByStatus: Record<string, number>;
+  /** The period (in days) the dashboard numbers cover. */
+  dashboardDays: number;
   syncAll: () => Promise<boolean>;
-  /** Reloads only the dashboard numbers (summary, chart, top products). */
-  refreshDashboard: () => Promise<void>;
+  /** Reloads only the dashboard numbers (summary, chart, top products); `days` changes the period they cover. */
+  refreshDashboard: (days?: number) => Promise<void>;
   /** Pulls everything from WooCommerce into the backend database, then reloads every screen from it. */
   importFromStore: () => Promise<StoreImportResult>;
   login: (email: string, password: string) => Promise<boolean>;
@@ -745,6 +767,7 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
   revenueHistory: [],
   topProducts: [],
   ordersByStatus: {},
+  dashboardDays: 30,
 
   login: async (email, password) => {
     set({ status: 'syncing', errorMessage: null });
@@ -778,11 +801,13 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
     });
   },
 
-  refreshDashboard: async () => {
+  refreshDashboard: async (days) => {
+    if (days !== undefined) set({ dashboardDays: days });
+    const period = days ?? get().dashboardDays;
     try {
       const [summary, revenueHistory, ordersByStatus, topProducts] = await Promise.all([
-        dashboardApi.getSummary(30),
-        dashboardApi.getRevenue(),
+        dashboardApi.getSummary(period),
+        dashboardApi.getRevenue(period),
         dashboardApi.getOrdersByStatus(),
         dashboardApi.getTopProducts(),
       ]);
@@ -843,8 +868,8 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
 
       const [dash, ...lists] = await Promise.allSettled([
         Promise.all([
-          dashboardApi.getSummary(30),
-          dashboardApi.getRevenue(),
+          dashboardApi.getSummary(get().dashboardDays),
+          dashboardApi.getRevenue(get().dashboardDays),
           dashboardApi.getOrdersByStatus(),
           dashboardApi.getTopProducts(),
         ]),

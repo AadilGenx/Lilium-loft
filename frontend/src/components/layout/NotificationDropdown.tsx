@@ -12,7 +12,9 @@ import { Bell, ShoppingCart, AlertTriangle, CheckCircle2, CheckCheck } from 'luc
 import { useUIStore } from '@/store';
 
 export function NotificationDropdown() {
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useUIStore();
+  const { notifications: allNotifications, markNotificationRead, markAllNotificationsRead } = useUIStore();
+  // Stock problems have their own alert button; this bell is for orders and system messages.
+  const notifications = allNotifications.filter((n) => n.type !== 'stock');
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter((n) => !n.read).length;

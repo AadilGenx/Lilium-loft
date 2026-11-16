@@ -54,13 +54,15 @@ export function PaymentsPage() {
         customerName: o.customerName,
         amount: o.total,
         currency: o.currency,
+        // Only what WooCommerce recorded: a payment date means paid. (An order being "processing" does not,
+        // e.g. cash on delivery.)
         status:
-          o.status === 'completed' || o.status === 'processing'
-            ? 'completed'
-            : o.status === 'refunded'
+          o.status === 'refunded'
             ? 'refunded'
             : o.status === 'failed' || o.status === 'cancelled'
             ? 'failed'
+            : o.datePaid
+            ? 'completed'
             : 'pending',
         paymentMethod: o.paymentMethodTitle || o.paymentMethod,
         date: o.dateCreated,
@@ -138,9 +140,9 @@ export function PaymentsPage() {
   const getStatusBadge = (status: Transaction['status']) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="success">Completed</Badge>;
+        return <Badge variant="success">Paid</Badge>;
       case 'pending':
-        return <Badge variant="secondary">Pending</Badge>;
+        return <Badge variant="secondary">Unpaid</Badge>;
       case 'refunded':
         return <Badge variant="purple">Refunded</Badge>;
       case 'failed':
@@ -287,7 +289,7 @@ export function PaymentsPage() {
                       <TableHead>Order</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Gateway</TableHead>
-                      <TableHead>Date & Time</TableHead>
+                      <TableHead>Order Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
@@ -303,7 +305,7 @@ export function PaymentsPage() {
                     {transactions.map((tx) => (
                       <TableRow key={tx.id}>
                         <TableCell className="font-mono text-xs text-slate-700 whitespace-nowrap">
-                          {tx.transactionReference}
+                          {tx.transactionReference || '—'}
                         </TableCell>
                         <TableCell className="font-bold font-mono text-xs text-slate-900 whitespace-nowrap">
                           {tx.orderNumber}

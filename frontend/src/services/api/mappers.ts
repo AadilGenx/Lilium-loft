@@ -84,6 +84,7 @@ export function mapBackendProduct(p: BackendProduct): Product {
     createdAt: p.woo_created_at ?? '',
     updatedAt: p.woo_modified_at ?? p.woo_created_at ?? '',
     featured: Boolean(p.featured),
+    lowStockAmount: p.low_stock_amount ?? undefined,
     totalSales: p.total_sales ?? 0,
     revenue: p.revenue ?? 0,
   };
@@ -116,13 +117,15 @@ export function mapBackendOrder(o: BackendOrder): Order {
 
   const items: OrderItem[] = (o.items ?? []).map((item) => {
     const lineTotal = num(item.total) ?? 0;
+    const lineSubtotal = num(item.subtotal) ?? lineTotal;
     return {
       id: String(item.id),
       productId: String(item.product_woo_id),
       name: item.name,
       sku: item.sku ?? '',
-      price: item.quantity > 0 ? lineTotal / item.quantity : 0,
+      price: item.quantity > 0 ? lineSubtotal / item.quantity : lineSubtotal,
       quantity: item.quantity,
+      subtotal: lineSubtotal,
       total: lineTotal,
     };
   });
@@ -155,12 +158,14 @@ export function mapBackendOrder(o: BackendOrder): Order {
     paymentMethod: o.payment_method ?? '',
     paymentMethodTitle: o.payment_method_title ?? '',
     transactionId: o.transaction_id ?? '',
-    // WooCommerce does not send a subtotal on the order list; derive it from the totals it did send.
-    subtotal: Math.max(0, total - shippingTotal - taxTotal + discountTotal),
+    datePaid: o.woo_paid_at ?? undefined,
+    // The sum of the line subtotals WooCommerce reports (not back-calculated from the totals).
+    subtotal: items.length > 0 ? items.reduce((sum, i) => sum + i.subtotal, 0) : undefined,
     shippingTotal,
     discountTotal,
     taxTotal,
     total,
+    refundedTotal: num(o.refunded_total) ?? 0,
     // The customer's own checkout note comes with the order; the rest are loaded on the detail page.
     notes: o.customer_note
       ? [
@@ -241,7 +246,8 @@ export function mapBackendCoupon(c: BackendCoupon): Coupon {
 export function mapShippingZone(z: BackendShippingZone): ShippingZone {
   const methods: ShippingMethod[] = z.methods.map((m) => {
     const cost = num(m.settings?.cost?.value as string | undefined);
-    const taxStatus = m.settings?.tax_status?.value === 'none' ? 'none' : 'taxable';
+    const reported = m.settings?.tax_status?.value;
+    const taxStatus = reported === 'none' || reported === 'taxable' ? reported : undefined;
 
     return {
       id: String(m.instance_id),

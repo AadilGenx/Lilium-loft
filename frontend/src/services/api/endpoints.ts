@@ -72,8 +72,8 @@ export const dashboardApi = {
     return apiClient<BackendDashboardSummary>(`/dashboard/summary?days=${days}`);
   },
 
-  async getRevenue(): Promise<BackendRevenuePoint[]> {
-    return apiClient<BackendRevenuePoint[]>('/dashboard/revenue');
+  async getRevenue(days = 30): Promise<BackendRevenuePoint[]> {
+    return apiClient<BackendRevenuePoint[]>(`/dashboard/revenue?days=${days}`);
   },
 
   async getOrdersByStatus(): Promise<Record<string, number>> {
@@ -236,8 +236,9 @@ export const customersApi = {
 
 // ----------------- Categories -----------------
 export const categoriesApi = {
-  async list(search?: string, perPage = 100): Promise<BackendPagination<BackendCategory>> {
+  async list(search?: string, perPage = 100, page = 1): Promise<BackendPagination<BackendCategory>> {
     const params = new URLSearchParams();
+    params.set('page', String(page));
     if (search) params.set('search', search);
     if (perPage) params.set('per_page', String(perPage));
     const query = params.toString();
@@ -259,8 +260,9 @@ export const categoriesApi = {
 
 // ----------------- Coupons -----------------
 export const couponsApi = {
-  async list(search?: string, perPage = 100): Promise<BackendPagination<BackendCoupon>> {
+  async list(search?: string, perPage = 100, page = 1): Promise<BackendPagination<BackendCoupon>> {
     const params = new URLSearchParams();
+    params.set('page', String(page));
     if (search) params.set('search', search);
     if (perPage) params.set('per_page', String(perPage));
     const query = params.toString();

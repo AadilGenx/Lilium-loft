@@ -34,11 +34,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useOrderStore } from '@/store';
+import { useOrderStore, useCustomerStore } from '@/store';
 import { OrderStatus } from '@/types';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { getErrorMessage } from '@/utils/errors';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
+import { STICKY_COLUMN } from '@/utils/sticky';
 import { toast } from 'sonner';
 
 export function OrderDetailPage() {
@@ -48,6 +49,10 @@ export function OrderDetailPage() {
   const { orders, loadOrderDetails, updateOrderStatus, addOrderNote, refundOrder } = useOrderStore();
 
   const order = orders.find((o) => o.id === id);
+  const customers = useCustomerStore((st) => st.customers);
+  const linkedCustomer = order
+    ? customers.find((c) => c.wooId > 0 && String(c.wooId) === order.customerId)
+    : undefined;
 
   // Notes and refunds live in WooCommerce; load them for this order.
   useEffect(() => {
@@ -166,7 +171,8 @@ export function OrderDetailPage() {
               {getStatusBadge(order.status)}
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Placed on {formatDateTime(order.dateCreated)} • Via {order.paymentMethodTitle}
+              Placed on {formatDateTime(order.dateCreated)}
+              {order.paymentMethodTitle ? ` • Via ${order.paymentMethodTitle}` : ''}
             </p>
           </div>
         </div>
@@ -188,6 +194,7 @@ export function OrderDetailPage() {
                 <SelectItem value="pending">Pending Payment</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
                 <SelectItem value="refunded">Refunded</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -264,46 +271,54 @@ export function OrderDetailPage() {
                 ))}
               </div>
 
-              {/* Totals Breakdown */}
+              {/* Totals Breakdown: only amounts WooCommerce reports for this order */}
               <div className="p-4 bg-slate-50/70 border-t border-slate-100 space-y-2 text-xs">
-                <div className="flex justify-between text-slate-600">
-                  <span>Items Subtotal:</span>
-                  <span className="font-medium text-slate-900">
-                    {formatCurrency(order.subtotal, order.currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Shipping & Delivery:</span>
-                  <span className="font-medium text-slate-900">
-                    {order.shippingTotal === 0 ? 'Free Shipping' : formatCurrency(order.shippingTotal, order.currency)}
-                  </span>
-                </div>
+                {order.subtotal !== undefined && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Items Subtotal:</span>
+                    <span className="font-medium text-slate-900">
+                      {formatCurrency(order.subtotal, order.currency)}
+                    </span>
+                  </div>
+                )}
                 {order.discountTotal > 0 && (
                   <div className="flex justify-between text-emerald-600 font-medium">
-                    <span>Discount Applied:</span>
+                    <span>Discount:</span>
                     <span>-{formatCurrency(order.discountTotal, order.currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-slate-600">
-                  <span>Sales Tax (WooCommerce Tax):</span>
+                  <span>Shipping:</span>
+                  <span className="font-medium text-slate-900">
+                    {formatCurrency(order.shippingTotal, order.currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Tax:</span>
                   <span className="font-medium text-slate-900">
                     {formatCurrency(order.taxTotal, order.currency)}
                   </span>
                 </div>
 
-                {totalRefunded > 0 && (
-                  <div className="flex justify-between text-purple-600 font-medium pt-1 border-t border-slate-200">
-                    <span>Total Refunded:</span>
-                    <span>-{formatCurrency(totalRefunded, order.currency)}</span>
-                  </div>
-                )}
-
                 <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200">
-                  <span>Net Order Total:</span>
-                  <span className="text-red-600">
-                    {formatCurrency(order.total - totalRefunded)}
-                  </span>
+                  <span>Order Total:</span>
+                  <span>{formatCurrency(order.total, order.currency)}</span>
                 </div>
+
+                {totalRefunded > 0 && (
+                  <>
+                    <div className="flex justify-between text-purple-600 font-medium">
+                      <span>Total Refunded:</span>
+                      <span>-{formatCurrency(totalRefunded, order.currency)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200">
+                      <span>Net After Refunds:</span>
+                      <span className="text-red-600">
+                        {formatCurrency(order.total - totalRefunded, order.currency)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -322,18 +337,22 @@ export function OrderDetailPage() {
                 <p className="font-semibold text-slate-800 text-sm">
                   {order.billing.firstName} {order.billing.lastName}
                 </p>
-                <p>{order.billing.address1}</p>
+                {order.billing.address1 && <p>{order.billing.address1}</p>}
                 {order.billing.address2 && <p>{order.billing.address2}</p>}
                 <p>
-                  {order.billing.city}, {order.billing.state} {order.billing.postcode}
+                  {[order.billing.city, order.billing.state, order.billing.postcode].filter(Boolean).join(', ')}
                 </p>
-                <p>{order.billing.country}</p>
-                <p className="pt-2 text-slate-500">
-                  Email: <span className="text-slate-800">{order.billing.email}</span>
-                </p>
-                <p className="text-slate-500">
-                  Phone: <span className="text-slate-800">{order.billing.phone}</span>
-                </p>
+                {order.billing.country && <p>{order.billing.country}</p>}
+                {order.billing.email && (
+                  <p className="pt-2 text-slate-500">
+                    Email: <span className="text-slate-800">{order.billing.email}</span>
+                  </p>
+                )}
+                {order.billing.phone && (
+                  <p className="text-slate-500">
+                    Phone: <span className="text-slate-800">{order.billing.phone}</span>
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -349,12 +368,12 @@ export function OrderDetailPage() {
                 <p className="font-semibold text-slate-800 text-sm">
                   {order.shipping.firstName} {order.shipping.lastName}
                 </p>
-                <p>{order.shipping.address1}</p>
+                {order.shipping.address1 && <p>{order.shipping.address1}</p>}
                 {order.shipping.address2 && <p>{order.shipping.address2}</p>}
                 <p>
-                  {order.shipping.city}, {order.shipping.state} {order.shipping.postcode}
+                  {[order.shipping.city, order.shipping.state, order.shipping.postcode].filter(Boolean).join(', ')}
                 </p>
-                <p>{order.shipping.country}</p>
+                {order.shipping.country && <p>{order.shipping.country}</p>}
               </CardContent>
             </Card>
           </div>
@@ -374,7 +393,7 @@ export function OrderDetailPage() {
                     <div key={ref.id} className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-1 text-xs">
                       <div>
                         <div className="font-semibold text-purple-900">
-                          {formatCurrency(ref.amount)} Refunded
+                          {formatCurrency(ref.amount, order.currency)} Refunded
                         </div>
                         <div className="text-slate-500 mt-0.5">
                           Reason: {ref.reason}
@@ -392,7 +411,7 @@ export function OrderDetailPage() {
         </div>
 
         {/* Right Column: Customer Info & Order Notes Feed (4 cols on lg/xl) */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className={`lg:col-span-4 space-y-6 ${STICKY_COLUMN}`}>
           {/* Customer Overview Card */}
           <Card>
             <CardHeader className="pb-3 border-b border-slate-100">
@@ -409,13 +428,17 @@ export function OrderDetailPage() {
                 <p className="text-slate-500">{order.customerEmail}</p>
               </div>
               <div className="pt-2 border-t border-slate-100">
-                <button
-                  onClick={() => navigate(`/customers/${order.customerId}`)}
-                  className="text-xs text-red-600 hover:underline font-semibold flex items-center gap-1"
-                >
-                  <span>View Customer History</span>
-                  <ExternalLink className="h-3 w-3" />
-                </button>
+                {order.customerId === '0' ? (
+                  <span className="text-xs text-slate-400">Guest checkout (no customer account)</span>
+                ) : linkedCustomer ? (
+                  <button
+                    onClick={() => navigate(`/customers/${linkedCustomer.id}`)}
+                    className="text-xs text-red-600 hover:underline font-semibold flex items-center gap-1"
+                  >
+                    <span>View Customer History</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -438,7 +461,13 @@ export function OrderDetailPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Transaction ID:</span>
                 <span className="font-mono text-slate-800 text-[11px] truncate max-w-[140px]" title={order.transactionId}>
-                  {order.transactionId}
+                  {order.transactionId || '—'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Paid:</span>
+                <span className="font-semibold text-slate-800">
+                  {order.datePaid ? formatDateTime(order.datePaid) : 'Not paid'}
                 </span>
               </div>
             </CardContent>

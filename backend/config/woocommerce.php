@@ -13,7 +13,4 @@ return [
     // Store configuration (shipping, settings, payment gateways) is read live from
     // WooCommerce with GET and cached this many seconds. 0 disables the cache.
     'config_cache_ttl' => (int) env('WOO_CONFIG_CACHE_TTL', 300),
-
-    // Products at or below this stock level count as "low stock".
-    'low_stock_threshold' => (int) env('WOO_LOW_STOCK_THRESHOLD', 5),
 ];

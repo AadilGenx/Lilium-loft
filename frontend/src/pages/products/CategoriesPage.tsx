@@ -24,6 +24,8 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { useCategoryStore } from '@/store';
 import { getErrorMessage } from '@/utils/errors';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { STICKY_COLUMN } from '@/utils/sticky';
 import { toast } from 'sonner';
 
 export function CategoriesPage() {
@@ -33,6 +35,7 @@ export function CategoriesPage() {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -101,7 +104,7 @@ export function CategoriesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Add Category Form (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className={`lg:col-span-4 space-y-6 ${STICKY_COLUMN}`}>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">
@@ -146,7 +149,7 @@ export function CategoriesPage() {
                     Thumbnail Image URL
                   </label>
                   <Input
-                    placeholder="https://images.unsplash.com/..."
+                    placeholder="https://"
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                   />
@@ -268,7 +271,7 @@ export function CategoriesPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                            onClick={() => setCategoryToDelete({ id: cat.id, name: cat.name })}
                             className="h-8 w-8 text-slate-400 hover:text-red-600"
                             title="Remove category"
                           >
@@ -284,6 +287,19 @@ export function CategoriesPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={categoryToDelete !== null}
+        onOpenChange={(open) => !open && setCategoryToDelete(null)}
+        title="Delete category permanently"
+        description={`Delete "${categoryToDelete?.name}" from WooCommerce? Categories have no trash, so this cannot be undone. Products in it are kept.`}
+        confirmLabel="Delete category"
+        onConfirm={async () => {
+          if (!categoryToDelete) return;
+          await handleDeleteCategory(categoryToDelete.id, categoryToDelete.name);
+          setCategoryToDelete(null);
+        }}
+      />
     </div>
   );
 }

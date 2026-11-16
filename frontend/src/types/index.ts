@@ -72,6 +72,8 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   featured?: boolean;
+  /** The product's own low-stock level; undefined means the store-wide WooCommerce setting applies. */
+  lowStockAmount?: number;
   /** Units sold over the product's lifetime, as counted by WooCommerce. */
   totalSales: number;
   /** Lifetime revenue from completed and processing orders. */
@@ -92,8 +94,12 @@ export interface OrderItem {
   productId: string;
   name: string;
   sku: string;
+  /** Unit price before discounts (line subtotal / quantity). */
   price: number;
   quantity: number;
+  /** Line total before discounts, as WooCommerce reports it. */
+  subtotal: number;
+  /** Line total after discounts. */
   total: number;
   image?: string;
   variationId?: string;
@@ -144,11 +150,16 @@ export interface Order {
   paymentMethod: string;
   paymentMethodTitle: string;
   transactionId: string;
-  subtotal: number;
+  /** When WooCommerce recorded the payment; undefined if it has not been paid. */
+  datePaid?: string;
+  /** Sum of the line subtotals reported by WooCommerce. */
+  subtotal?: number;
   shippingTotal: number;
   discountTotal: number;
   taxTotal: number;
   total: number;
+  /** Refunded so far, as WooCommerce reports it on the order. */
+  refundedTotal: number;
   notes: OrderNote[];
   refunds: OrderRefund[];
 }
@@ -196,7 +207,8 @@ export interface ShippingMethod {
   /** null when the method has no cost setting. */
   cost: number | null;
   enabled: boolean;
-  taxStatus: 'taxable' | 'none';
+  /** undefined when WooCommerce does not report one for this method. */
+  taxStatus?: 'taxable' | 'none';
 }
 
 export interface ShippingZone {

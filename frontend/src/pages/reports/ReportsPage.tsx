@@ -155,8 +155,8 @@ export function ReportsPage() {
             Analytics & Reports
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Revenue, top categories and products, and your best customers, from completed and
-            processing orders.
+            Sales, top categories and products, and your best customers. Only processing and completed
+            orders count; failed, cancelled, pending and on-hold orders do not.
           </p>
         </div>
 
@@ -225,7 +225,7 @@ export function ReportsPage() {
                 <div className="text-2xl font-bold text-slate-900 mt-1">
                   {totals ? formatCurrency(totals.net_sales) : '—'}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">Gross minus shipping & tax</div>
+                <div className="text-xs text-slate-400 mt-1">After refunds, shipping & tax</div>
               </CardContent>
             </Card>
 
@@ -236,7 +236,11 @@ export function ReportsPage() {
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">{totals ? totals.orders : '—'}</div>
                 <div className="text-xs text-slate-400 mt-1">
-                  {totals ? `${formatCurrency(totals.discounts)} in discounts` : ''}
+                  {totals
+                    ? `${formatCurrency(totals.discounts)} in discounts${
+                        totals.refunds > 0 ? ` · ${formatCurrency(totals.refunds)} refunded` : ''
+                      }`
+                    : ''}
                 </div>
               </CardContent>
             </Card>
@@ -257,7 +261,7 @@ export function ReportsPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold text-slate-900">
-                Gross vs Net Revenue
+                Gross vs Net Sales
               </CardTitle>
               <CardDescription className="text-xs">
                 {sales ? `Grouped by ${sales.group_by}` : ''}

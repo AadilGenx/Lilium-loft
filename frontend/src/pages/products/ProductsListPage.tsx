@@ -47,11 +47,14 @@ import { useProductStore } from '@/store';
 import { Product } from '@/types';
 import { formatCurrency, formatMoney } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
-import { stockState, isOnSale } from '@/utils/stock';
+import { isOnSale } from '@/utils/stock';
+import { ProductStatusBadge } from '@/components/products/ProductStatusBadge';
+import { useStockState } from '@/hooks/useStockState';
 import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function ProductsListPage() {
+  const stockOf = useStockState();
   const navigate = useNavigate();
   const { products, deleteProduct } = useProductStore();
 
@@ -84,15 +87,16 @@ export function ProductsListPage() {
 
       const matchesStock =
         selectedStock === 'all' ||
-        (selectedStock === 'instock' && stockState(p) === 'in') ||
-        (selectedStock === 'lowstock' && stockState(p) === 'low') ||
-        (selectedStock === 'outofstock' && stockState(p) === 'out');
+        (selectedStock === 'instock' && stockOf(p) === 'in') ||
+        (selectedStock === 'lowstock' && stockOf(p) === 'low') ||
+        (selectedStock === 'outofstock' && stockOf(p) === 'out') ||
+        (selectedStock === 'onbackorder' && stockOf(p) === 'backorder');
 
       const matchesType = selectedType === 'all' || p.type === selectedType;
 
       return matchesSearch && matchesCat && matchesStock && matchesType;
     });
-  }, [products, searchTerm, selectedCategory, selectedStock, selectedType]);
+  }, [products, searchTerm, selectedCategory, selectedStock, selectedType, stockOf]);
 
   const totalPages = Math.ceil(filteredProducts.length / pageSize);
   const paginatedProducts = filteredProducts.slice(
@@ -129,9 +133,12 @@ export function ProductsListPage() {
   };
 
   const getStockBadge = (prod: Product) => {
-    const state = stockState(prod);
+    const state = stockOf(prod);
     if (state === 'out') {
       return <Badge variant="destructive">Out of Stock</Badge>;
+    }
+    if (state === 'backorder') {
+      return <Badge variant="warning">On Backorder</Badge>;
     }
     if (state === 'low') {
       return (
@@ -232,9 +239,10 @@ export function ProductsListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Stock Status</SelectItem>
-                <SelectItem value="instock">In Stock (&gt;5)</SelectItem>
-                <SelectItem value="lowstock">Low Stock (≤5)</SelectItem>
-                <SelectItem value="outofstock">Out of Stock (0)</SelectItem>
+                <SelectItem value="instock">In Stock</SelectItem>
+                <SelectItem value="lowstock">Low Stock</SelectItem>
+                <SelectItem value="outofstock">Out of Stock</SelectItem>
+                <SelectItem value="onbackorder">On Backorder</SelectItem>
               </SelectContent>
             </Select>
 
@@ -344,6 +352,7 @@ export function ProductsListPage() {
                     {/* Price */}
                     <TableCell>
                       <div className="font-semibold text-slate-900">
+                        {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
                         {formatMoney(product.price)}
                       </div>
                       {isOnSale(product) && (
@@ -369,13 +378,7 @@ export function ProductsListPage() {
 
                     {/* Status */}
                     <TableCell>
-                      {product.status === 'publish' ? (
-                        <Badge variant="success">Published</Badge>
-                      ) : product.status === 'draft' ? (
-                        <Badge variant="outline">Draft</Badge>
-                      ) : (
-                        <Badge variant="warning">Pending</Badge>
-                      )}
+                      <ProductStatusBadge status={product.status} />
                     </TableCell>
 
                     {/* Actions Menu */}
@@ -433,9 +436,9 @@ export function ProductsListPage() {
       <ConfirmDialog
         open={!!productToDelete}
         onOpenChange={(open) => !open && setProductToDelete(null)}
-        title="Delete Product"
-        description={`Are you sure you want to delete "${productToDelete?.name}"? This action removes it from the catalog and cannot be undone.`}
-        confirmLabel="Delete Product"
+        title="Move product to trash"
+        description={`Move "${productToDelete?.name}" to the trash in WooCommerce? It will no longer be sold or shown in your store. It can be restored from the WooCommerce trash.`}
+        confirmLabel="Move to trash"
         onConfirm={handleDelete}
       />
     </div>

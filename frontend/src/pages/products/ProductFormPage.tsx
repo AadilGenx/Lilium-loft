@@ -20,6 +20,7 @@ import { useProductStore, useCategoryStore } from '@/store';
 import { ProductImage } from '@/types';
 import { getErrorMessage } from '@/utils/errors';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
+import { STICKY_COLUMN } from '@/utils/sticky';
 import { toast } from 'sonner';
 
 export function ProductFormPage() {
@@ -164,8 +165,8 @@ export function ProductFormPage() {
 
   return (
     <div className="space-y-6 w-full pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Top Header: stays at the top while the long form scrolls, so Save is always reachable */}
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 py-3 bg-slate-50/95 backdrop-blur border-b border-slate-200/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
@@ -457,7 +458,7 @@ export function ProductFormPage() {
           </div>
 
           {/* Right sidebar options: 4 cols on lg, 3 cols on xl */}
-          <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+          <div className={`lg:col-span-4 xl:col-span-3 space-y-6 ${STICKY_COLUMN} lg:top-24 lg:max-h-[calc(100dvh-10rem)]`}>
             {/* Publish Status Card */}
             <Card>
               <CardHeader className="pb-3">

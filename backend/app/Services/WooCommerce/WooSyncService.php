@@ -166,8 +166,10 @@ class WooSyncService
             $order = WooOrder::updateOrCreate(['woo_id' => $o['id']], [
                 'number' => $o['number'],
                 'status' => $o['status'],
-                'currency' => $o['currency'] ?? 'INR',
+                'currency' => $o['currency'] ?? null,
                 'total' => $o['total'] ?? 0,
+                // How much of the order WooCommerce says was refunded: sales figures are net of it.
+                'refunded_total' => OrderRefunds::total($o),
                 'discount_total' => $o['discount_total'] ?? 0,
                 'shipping_total' => $o['shipping_total'] ?? 0,
                 'total_tax' => $o['total_tax'] ?? 0,

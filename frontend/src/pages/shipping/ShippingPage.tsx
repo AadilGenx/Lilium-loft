@@ -7,7 +7,7 @@ import {
   Globe,
   MapPin,
   Check,
-  DollarSign,
+  IndianRupee,
   Package,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,7 +34,9 @@ import { useShippingStore } from '@/store';
 import { ShippingMethod } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { getErrorMessage } from '@/utils/errors';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
+import { STICKY_COLUMN } from '@/utils/sticky';
 import { toast } from 'sonner';
 
 export function ShippingPage() {
@@ -52,12 +54,13 @@ export function ShippingPage() {
   const [methodModalOpen, setMethodModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<ShippingMethod | null>(null);
   const [saving, setSaving] = useState(false);
+  const [methodToDelete, setMethodToDelete] = useState<ShippingMethod | null>(null);
 
   // Form state
   const [methodType, setMethodType] = useState<string>('flat_rate');
   const [methodTitle, setMethodTitle] = useState('');
   const [methodCost, setMethodCost] = useState<number>(0);
-  const [taxStatus, setTaxStatus] = useState<'taxable' | 'none'>('taxable');
+  const [taxStatus, setTaxStatus] = useState<'taxable' | 'none' | undefined>(undefined);
 
   useEffect(() => {
     fetchShipping();
@@ -70,7 +73,7 @@ export function ShippingPage() {
     setMethodType('flat_rate');
     setMethodTitle('');
     setMethodCost(0);
-    setTaxStatus('taxable');
+    setTaxStatus(undefined);
     setMethodModalOpen(true);
   };
 
@@ -171,7 +174,7 @@ export function ShippingPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Shipping Zones List (4 cols) */}
-        <div className="lg:col-span-4 space-y-4">
+        <div className={`lg:col-span-4 space-y-4 ${STICKY_COLUMN}`}>
           <Card>
             <CardHeader className="pb-3 border-b border-slate-100">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -257,10 +260,14 @@ export function ShippingPage() {
                             <span className="capitalize font-medium text-slate-600">
                               {method.type.replace(/_/g, ' ')}
                             </span>{' '}
-                            • Tax:{' '}
-                            <span className="capitalize text-slate-600">
-                              {method.taxStatus}
-                            </span>
+                            {method.taxStatus && (
+                              <>
+                                {' '}• Tax:{' '}
+                                <span className="capitalize text-slate-600">
+                                  {method.taxStatus}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -290,7 +297,7 @@ export function ShippingPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDeleteMethod(method.id, method.title)}
+                            onClick={() => setMethodToDelete(method)}
                             className="h-8 w-8 text-slate-400 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -368,7 +375,7 @@ export function ShippingPage() {
                 onValueChange={(val: any) => setTaxStatus(val)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Use WooCommerce default" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="taxable">Taxable</SelectItem>
@@ -397,6 +404,19 @@ export function ShippingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={methodToDelete !== null}
+        onOpenChange={(open) => !open && setMethodToDelete(null)}
+        title="Remove shipping method"
+        description={`Remove "${methodToDelete?.title}" from this zone in WooCommerce? Customers will no longer be offered it. This cannot be undone.`}
+        confirmLabel="Remove method"
+        onConfirm={async () => {
+          if (!methodToDelete) return;
+          await handleDeleteMethod(methodToDelete.id, methodToDelete.title);
+          setMethodToDelete(null);
+        }}
+      />
     </div>
   );
 }

@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Services\WooCommerce\StockRules;
+use App\Services\WooCommerce\StoreCurrency;
+use App\Services\WooCommerce\WooClient;
 use App\Services\WooCommerce\WooSyncService;
 use Illuminate\Console\Command;
 
@@ -13,7 +16,7 @@ class WooSync extends Command
 
     protected $description = 'Read-only import of WooCommerce data into the local mirror';
 
-    public function handle(WooSyncService $sync): int
+    public function handle(WooSyncService $sync, WooClient $woo): int
     {
         $resources = $this->argument('resource') ?: WooSyncService::RESOURCES;
         $failed = false;
@@ -37,6 +40,9 @@ class WooSync extends Command
                 $failed = true;
             }
         }
+
+        StockRules::capture($woo); // WooCommerce's own low-stock level
+        StoreCurrency::capture($woo); // and its currency
 
         return $failed ? self::FAILURE : self::SUCCESS;
     }

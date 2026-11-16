@@ -298,8 +298,10 @@ export function CouponsListPage() {
                     <TableCell>
                       {coupon.status === 'active' ? (
                         <Badge variant="success">Active</Badge>
-                      ) : (
+                      ) : coupon.status === 'expired' ? (
                         <Badge variant="outline">Expired</Badge>
+                      ) : (
+                        <Badge variant="secondary">Draft</Badge>
                       )}
                     </TableCell>
 
@@ -382,8 +384,8 @@ export function CouponsListPage() {
                 </label>
                 <Input
                   type="number"
-                  step="0.1"
-                  min="1"
+                  step="any"
+                  min="0"
                   placeholder="10"
                   {...register('amount')}
                 />
@@ -396,7 +398,7 @@ export function CouponsListPage() {
             {/* Description */}
             <div className="space-y-1">
               <label className="font-semibold text-slate-700">
-                Description <span className="text-red-500">*</span>
+                Description
               </label>
               <Input
                 placeholder="Internal memo or customer promotional tooltip"

@@ -8,10 +8,13 @@ use App\Models\WooOrder;
 use App\Models\WooOrderItem;
 use App\Models\WooProduct;
 use App\Models\WooSyncLog;
+use App\Services\WooCommerce\StockRules;
+use App\Services\WooCommerce\StoreCurrency;
 use App\Services\WooCommerce\WooErrors;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class DashboardController extends Controller
@@ -35,9 +38,12 @@ class DashboardController extends Controller
                 new OA\Property(property: 'orders', type: 'integer', example: 14),
                 new OA\Property(property: 'previous_orders', type: 'integer', example: 9),
                 new OA\Property(property: 'average_order_value', type: 'number', format: 'float', example: 1303.61),
+                new OA\Property(property: 'refunded', type: 'number', format: 'float', description: 'Refunded on those orders (already subtracted from revenue)'),
+                new OA\Property(property: 'paid_revenue', type: 'number', format: 'float', description: 'Revenue from orders WooCommerce has a payment date for'),
+                new OA\Property(property: 'unpaid_revenue', type: 'number', format: 'float', description: 'Revenue from processing orders with no payment date yet (e.g. cash on delivery)'),
                 new OA\Property(property: 'awaiting_fulfilment', type: 'integer', description: 'processing + on-hold + pending orders (all time)', example: 3),
                 new OA\Property(property: 'customers', type: 'integer', example: 1),
-                new OA\Property(property: 'currency', type: 'string', nullable: true, example: 'INR', description: 'ISO currency code of the most recent order; null when there are no orders'),
+                new OA\Property(property: 'currency', type: 'string', nullable: true, example: 'INR', description: 'ISO currency code from WooCommerce settings (or the latest order); null when unknown'),
                 new OA\Property(property: 'published_products', type: 'integer', example: 95),
                 new OA\Property(property: 'out_of_stock_products', type: 'integer', example: 4),
             ])),
@@ -52,20 +58,31 @@ class DashboardController extends Controller
         $current = WooOrder::whereIn('status', self::PAID)->where('woo_created_at', '>=', $now->copy()->subDays($days));
         $previous = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$now->copy()->subDays($days * 2), $now->copy()->subDays($days)]);
 
-        $revenue = (float) $current->sum('total');
+        // Sales = processing + completed orders, minus what was refunded on them (failed, cancelled, pending and
+        // on-hold orders are never counted). "Awaiting payment" are such orders WooCommerce has no payment date for
+        // (e.g. cash on delivery).
+        $net = DB::raw('total - refunded_total');
+        $revenue = (float) $current->sum($net);
         $orders = $current->count();
+        $refunded = (float) (clone $current)->sum('refunded_total');
+        $unpaid = (float) (clone $current)->whereNull('woo_paid_at')->sum($net);
 
         return response()->json([
             'days' => $days,
             'revenue' => $revenue,
-            'previous_revenue' => (float) $previous->sum('total'),
+            'refunded' => round($refunded, 2),
+            'paid_revenue' => round($revenue - $unpaid, 2),
+            'unpaid_revenue' => round($unpaid, 2),
+            'previous_revenue' => (float) $previous->sum($net),
             'orders' => $orders,
             'previous_orders' => $previous->count(),
             'average_order_value' => $orders ? round($revenue / $orders, 2) : 0,
             'awaiting_fulfilment' => WooOrder::whereIn('status', ['processing', 'on-hold', 'pending'])->count(),
             'customers' => WooCustomer::count(),
-            // The store's currency, as used by its most recent order. null when there are no orders yet.
-            'currency' => WooOrder::whereNotNull('currency')->orderByDesc('woo_created_at')->orderByDesc('id')->value('currency'),
+            // The store's currency from WooCommerce's own setting (read on each import), else its latest order's. null if unknown.
+            'currency' => StoreCurrency::current(),
+            // WooCommerce's store-wide low-stock level; null until it has been read during an import.
+            'low_stock_threshold' => StockRules::globalThreshold(),
             'published_products' => WooProduct::where('status', 'publish')->count(),
             'out_of_stock_products' => WooProduct::where('status', 'publish')->where('stock_status', 'outofstock')->count(),
         ]);
@@ -93,7 +110,7 @@ class DashboardController extends Controller
         $from = now()->subDays($days - 1)->startOfDay();
 
         $rows = WooOrder::whereIn('status', self::PAID)->where('woo_created_at', '>=', $from)
-            ->selectRaw('DATE(woo_created_at) as d, SUM(total) as revenue, COUNT(*) as orders')
+            ->selectRaw('DATE(woo_created_at) as d, SUM(total - refunded_total) as revenue, COUNT(*) as orders')
             ->groupBy('d')->get()->keyBy('d');
 
         $out = [];

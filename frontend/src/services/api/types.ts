@@ -66,6 +66,8 @@ export interface BackendProduct {
   featured?: boolean;
   /** Lifetime revenue from completed and processing orders (computed by the backend). */
   revenue?: number;
+  /** The product's own low-stock level in WooCommerce; null means it uses the store-wide setting. */
+  low_stock_amount?: number | null;
   gallery?: { id: number; src: string; alt: string }[];
 }
 
@@ -89,6 +91,7 @@ export interface BackendOrder {
   status: string;
   currency: string;
   total: string;
+  refunded_total?: string;
   discount_total: string;
   shipping_total: string;
   total_tax: string;
@@ -167,7 +170,14 @@ export interface BackendCoupon {
 
 export interface BackendDashboardSummary {
   days: number;
+  /** Processing + completed orders in the period, minus refunds. */
   revenue: number;
+  /** Refunded on those orders (already subtracted from revenue). */
+  refunded: number;
+  /** Part of revenue from orders WooCommerce has a payment date for. */
+  paid_revenue: number;
+  /** Part of revenue from orders with no payment date yet (e.g. cash on delivery). */
+  unpaid_revenue: number;
   previous_revenue: number;
   orders: number;
   previous_orders: number;
@@ -176,6 +186,8 @@ export interface BackendDashboardSummary {
   customers: number;
   /** Currency of the most recent order; null when there are no orders yet. */
   currency: string | null;
+  /** WooCommerce's store-wide low-stock level; null until the backend has read it during an import. */
+  low_stock_threshold: number | null;
   published_products: number;
   out_of_stock_products: number;
 }
@@ -279,6 +291,7 @@ export interface BackendSalesReport {
   totals: {
     orders: number;
     gross_sales: number;
+    refunds: number;
     discounts: number;
     shipping: number;
     tax: number;

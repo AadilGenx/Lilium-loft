@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  DollarSign,
+  IndianRupee,
   ShoppingCart,
   Package,
   Users,
@@ -27,7 +27,7 @@ import {
 import { useProductStore, useOrderStore, useCustomerStore, useBackendSyncStore } from '@/store';
 import { formatCurrency, formatDate, formatNumber } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
-import { stockState } from '@/utils/stock';
+import { useStockState } from '@/hooks/useStockState';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import {
   AreaChart,
@@ -50,14 +50,14 @@ interface TopProductItem {
 }
 
 export function DashboardPage() {
+  const stockOf = useStockState();
   const currencyLabel = useCurrencyLabel();
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState('30d');
 
   const products = useProductStore((s) => s.products);
   const orders = useOrderStore((s) => s.orders);
   const customers = useCustomerStore((s) => s.customers);
-  const { summary, revenueHistory, topProducts: backendTopProducts } = useBackendSyncStore();
+  const { summary, revenueHistory, topProducts: backendTopProducts, dashboardDays, refreshDashboard } = useBackendSyncStore();
 
   // Everything here comes from the backend dashboard endpoints; with no data it simply shows zeros / empty states.
   const totalRevenue = summary?.revenue ?? 0;
@@ -80,7 +80,7 @@ export function DashboardPage() {
       </span>
     );
 
-  const lowStockProducts = products.filter((p) => stockState(p) !== 'in');
+  const lowStockProducts = products.filter((p) => stockOf(p) === 'out' || stockOf(p) === 'low');
 
   const activeChartData = useMemo(
     () =>
@@ -114,6 +114,7 @@ export function DashboardPage() {
         Status: o.status,
         Date: o.dateCreated,
         Total: o.total,
+        Currency: o.currency,
         PaymentMethod: o.paymentMethodTitle,
       })),
       'woocommerce-sales-summary'
@@ -133,8 +134,9 @@ export function DashboardPage() {
       case 'refunded':
         return <Badge variant="purple">Refunded</Badge>;
       case 'cancelled':
-      case 'failed':
         return <Badge variant="destructive">Cancelled</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -149,19 +151,22 @@ export function DashboardPage() {
             Store Overview
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Real-time analytics and store performance from your WooCommerce catalog.
+            Sales, orders and stock from your WooCommerce store.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <Select value={timeRange} onValueChange={setTimeRange}>
+          <Select
+            value={String(dashboardDays)}
+            onValueChange={(v) => refreshDashboard(Number(v))}
+          >
             <SelectTrigger className="flex-1 sm:w-36 bg-white">
               <Calendar className="h-4 w-4 mr-2 text-slate-400" />
               <SelectValue placeholder="Period" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="7d">Last 7 Days</SelectItem>
-              <SelectItem value="30d">Last 30 Days</SelectItem>
-              <SelectItem value="90d">Last 90 Days</SelectItem>
+              <SelectItem value="7">Last 7 Days</SelectItem>
+              <SelectItem value="30">Last 30 Days</SelectItem>
+              <SelectItem value="90">Last 90 Days</SelectItem>
             </SelectContent>
           </Select>
 
@@ -184,10 +189,10 @@ export function DashboardPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Revenue
+                Total Sales
               </span>
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
-                <DollarSign className="h-5 w-5" />
+                <IndianRupee className="h-5 w-5" />
               </div>
             </div>
             <div className="mt-3">
@@ -200,6 +205,22 @@ export function DashboardPage() {
                   {summary ? (revenueChange === null ? `last ${summary.days} days` : 'vs previous period') : ''}
                 </span>
               </div>
+              {summary && (
+                <div className="mt-1.5 text-[11px] leading-snug text-slate-400">
+                  <div>
+                    Paid {formatCurrency(summary.paid_revenue)}
+                    {summary.unpaid_revenue > 0 && (
+                      <span className="text-amber-600">
+                        {' '}· Awaiting payment {formatCurrency(summary.unpaid_revenue)}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    Processing + completed orders
+                    {summary.refunded > 0 ? `, after ${formatCurrency(summary.refunded)} refunded` : ''}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -416,12 +437,12 @@ export function DashboardPage() {
                   <div className="text-right">
                     <span
                       className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
-                        stockState(p) === 'out'
+                        stockOf(p) === 'out'
                           ? 'bg-red-100 text-red-700'
                           : 'bg-amber-100 text-amber-700'
                       }`}
                     >
-                      {stockState(p) === 'out' ? 'Out of stock' : `${p.stockQuantity} left`}
+                      {stockOf(p) === 'out' ? 'Out of stock' : `${p.stockQuantity} left`}
                     </span>
                     <button
                       onClick={() => navigate('/inventory')}
@@ -553,9 +574,6 @@ export function DashboardPage() {
                   <div className="text-right">
                     <span className="text-xs font-bold text-slate-900">
                       {formatCurrency(p.revenue)}
-                    </span>
-                    <span className="block text-[10px] text-emerald-600 font-medium">
-                      High margin
                     </span>
                   </div>
                 </div>

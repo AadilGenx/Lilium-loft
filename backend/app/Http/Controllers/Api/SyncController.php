@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\WooCommerce\MirrorVersion;
+use App\Services\WooCommerce\StockRules;
+use App\Services\WooCommerce\StoreCurrency;
+use App\Services\WooCommerce\WooClient;
 use App\Services\WooCommerce\WooErrors;
 use App\Services\WooCommerce\WooSyncService;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +39,7 @@ class SyncController extends Controller
             new OA\Response(response: 502, description: 'Every resource failed (WooCommerce unreachable or not configured)', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
         ],
     )]
-    public function run(WooSyncService $sync): JsonResponse
+    public function run(WooSyncService $sync, WooClient $woo): JsonResponse
     {
         $lock = Cache::lock('woo-sync-run', 900);
         if (! $lock->get()) {
@@ -58,6 +61,10 @@ class SyncController extends Controller
                     $results[] = ['resource' => $resource, 'status' => 'failed', 'records' => 0, 'error' => WooErrors::describe($e, "import {$resource}")];
                 }
             }
+
+            // WooCommerce's own low-stock level (used to decide what "low stock" means). Best effort.
+            StockRules::capture($woo);
+            StoreCurrency::capture($woo);
         } finally {
             $lock->release();
         }

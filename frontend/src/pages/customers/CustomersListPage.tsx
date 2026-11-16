@@ -7,7 +7,7 @@ import {
   Download,
   Mail,
   ShoppingBag,
-  DollarSign,
+  IndianRupee,
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
@@ -231,7 +231,7 @@ export function CustomersListPage() {
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-slate-500">
-                      @{customer.username}
+                      {customer.username ? `@${customer.username}` : ''}
                     </TableCell>
                     <TableCell className="text-xs text-slate-500">
                       {formatDate(customer.registeredDate)}

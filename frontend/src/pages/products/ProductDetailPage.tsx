@@ -11,7 +11,7 @@ import {
   Tag,
   Boxes,
   ExternalLink,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   BarChart3,
   Sparkles,
@@ -25,11 +25,16 @@ import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useProductStore, useOrderStore } from '@/store';
 import { formatCurrency, formatDate, formatMoney } from '@/utils/formatters';
-import { stockState, isOnSale } from '@/utils/stock';
+import { isOnSale } from '@/utils/stock';
+import { ProductStatusBadge } from '@/components/products/ProductStatusBadge';
+import { htmlToText } from '@/utils/html';
+import { useStockState } from '@/hooks/useStockState';
 import { getErrorMessage } from '@/utils/errors';
+import { STICKY_COLUMN } from '@/utils/sticky';
 import { toast } from 'sonner';
 
 export function ProductDetailPage() {
+  const stockOf = useStockState();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { products, deleteProduct, adjustStock } = useProductStore();
@@ -88,7 +93,7 @@ export function ProductDetailPage() {
     toast.success('Product link copied to clipboard.');
   };
 
-  const stock = stockState(product);
+  const stock = stockOf(product);
   const isLowStock = stock === 'low';
   const isOutOfStock = stock === 'out';
 
@@ -111,13 +116,7 @@ export function ProductDetailPage() {
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 {product.name}
               </h1>
-              {product.status === 'publish' ? (
-                <Badge variant="success" className="text-xs">Published</Badge>
-              ) : product.status === 'draft' ? (
-                <Badge variant="outline" className="text-xs">Draft</Badge>
-              ) : (
-                <Badge variant="warning" className="text-xs">Pending</Badge>
-              )}
+              <ProductStatusBadge status={product.status} className="text-xs" />
               {product.type === 'variable' && (
                 <Badge variant="purple" className="text-xs">
                   Variable
@@ -178,6 +177,7 @@ export function ProductDetailPage() {
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-bold text-slate-900">
+                {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
                 {formatMoney(product.price)}
               </span>
               {isOnSale(product) && (
@@ -214,6 +214,8 @@ export function ProductDetailPage() {
             <div className="mt-1 flex items-center gap-2">
               {isOutOfStock ? (
                 <Badge variant="destructive">Out of Stock</Badge>
+              ) : stock === 'backorder' ? (
+                <Badge variant="warning">On Backorder</Badge>
               ) : isLowStock ? (
                 <Badge variant="warning">Low Stock ({product.stockQuantity} left)</Badge>
               ) : product.manageStock ? (
@@ -262,7 +264,7 @@ export function ProductDetailPage() {
       {/* Main 12-Column Responsive Body */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Image Gallery, Details, & Taxonomy (5 cols on lg, 4 cols on xl) */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-5">
+        <div className={`lg:col-span-5 xl:col-span-4 space-y-5 ${STICKY_COLUMN}`}>
           {/* Main Hero Image */}
           <Card className="overflow-hidden border-slate-200 shadow-sm">
             <div className="aspect-square bg-slate-100 flex items-center justify-center relative group">
@@ -312,7 +314,7 @@ export function ProductDetailPage() {
             </CardHeader>
             <CardContent className="pt-4 space-y-4 text-xs">
               <div>
-                <span className="text-slate-400 block mb-1.5 font-medium">Departments</span>
+                <span className="text-slate-400 block mb-1.5 font-medium">Categories</span>
                 <div className="flex flex-wrap gap-1.5">
                   {product.categories.map((c) => (
                     <Badge
@@ -357,11 +359,11 @@ export function ProductDetailPage() {
             <CardContent className="pt-4 space-y-4 text-sm text-slate-700">
               {product.shortDescription && (
                 <div className="p-3.5 rounded-lg bg-red-50/40 border border-red-100 text-slate-800 text-xs font-medium leading-relaxed">
-                  {product.shortDescription}
+                  {htmlToText(product.shortDescription)}
                 </div>
               )}
-              <div className="prose prose-sm max-w-none text-slate-600 leading-relaxed">
-                {product.description || 'No detailed specifications recorded for this merchandise.'}
+              <div className="prose prose-sm max-w-none text-slate-600 leading-relaxed whitespace-pre-line">
+                {htmlToText(product.description) || 'No description in WooCommerce.'}
               </div>
             </CardContent>
           </Card>
@@ -506,9 +508,9 @@ export function ProductDetailPage() {
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
-        title="Delete Product"
-        description={`Are you sure you want to delete "${product.name}"? This action cannot be reversed.`}
-        confirmLabel="Delete Product"
+        title="Move product to trash"
+        description={`Move "${product.name}" to the trash in WooCommerce? It will no longer be sold or shown in your store. It can be restored from the WooCommerce trash.`}
+        confirmLabel="Move to trash"
         onConfirm={handleDelete}
       />
     </div>

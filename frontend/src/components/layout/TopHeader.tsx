@@ -3,6 +3,7 @@ import { Menu, Search, Plus, RefreshCw, CheckCircle2, AlertCircle } from 'lucide
 import { useUIStore, useBackendSyncStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { NotificationDropdown } from './NotificationDropdown';
+import { StockAlertDropdown } from './StockAlertDropdown';
 import { ProfileDropdown } from './ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '@/utils/errors';
@@ -108,6 +109,7 @@ export function TopHeader() {
 
         <div className="h-4 w-px bg-slate-200 hidden sm:block" />
 
+        <StockAlertDropdown />
         <NotificationDropdown />
         <ProfileDropdown />
       </div>

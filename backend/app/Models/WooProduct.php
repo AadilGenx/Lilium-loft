@@ -36,7 +36,7 @@ class WooProduct extends Model
     }
 
     /** Fields that live only in the raw WooCommerce payload. Append them where the full record is needed. */
-    public const DETAIL_ATTRS = ['description', 'short_description', 'featured', 'gallery'];
+    public const DETAIL_ATTRS = ['description', 'short_description', 'featured', 'gallery', 'low_stock_amount'];
 
     public function getDescriptionAttribute(): ?string
     {
@@ -46,6 +46,14 @@ class WooProduct extends Model
     public function getShortDescriptionAttribute(): ?string
     {
         return $this->raw['short_description'] ?? null;
+    }
+
+    /** The product's own low-stock level in WooCommerce (null = it uses the store-wide setting). */
+    public function getLowStockAmountAttribute(): ?int
+    {
+        $v = $this->raw['low_stock_amount'] ?? null;
+
+        return is_numeric($v) && $v !== '' ? (int) $v : null;
     }
 
     public function getFeaturedAttribute(): bool

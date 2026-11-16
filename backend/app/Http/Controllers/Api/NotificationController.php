@@ -7,6 +7,7 @@ use App\Models\WooOrder;
 use App\Models\WooProduct;
 use App\Models\WooSyncLog;
 use App\Models\WooWriteAudit;
+use App\Services\WooCommerce\StockRules;
 use App\Services\WooCommerce\WooErrors;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -62,7 +63,6 @@ class NotificationController extends Controller
         $days = (int) $request->input('days', 7);
         $limit = (int) $request->input('limit', 30);
         $since = $request->filled('since') ? Carbon::parse($request->input('since')) : null;
-        $threshold = (int) config('woocommerce.low_stock_threshold');
         $recent = now()->subDays($days);
 
         $items = collect();
@@ -95,9 +95,7 @@ class NotificationController extends Controller
                 'Out of stock', $p->name, 'products', $p->id, $p->woo_modified_at,
             )));
 
-        WooProduct::where('status', 'publish')->where('manage_stock', true)
-            ->where('stock_quantity', '>', 0)->where('stock_quantity', '<=', $threshold)
-            ->get(['id', 'woo_id', 'name', 'stock_quantity', 'woo_modified_at'])
+        StockRules::lowStockProducts()
             ->each(fn ($p) => $items->push($this->item(
                 "low_stock:{$p->woo_id}:{$p->stock_quantity}", 'low_stock', 'warning',
                 'Low stock', "{$p->name}: {$p->stock_quantity} left", 'products', $p->id, $p->woo_modified_at,

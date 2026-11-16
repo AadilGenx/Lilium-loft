@@ -6,7 +6,7 @@ import {
   Phone,
   Calendar,
   ShoppingBag,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   MapPin,
   Edit,
@@ -36,6 +36,7 @@ import { useCustomerStore, useOrderStore } from '@/store';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
+import { STICKY_COLUMN } from '@/utils/sticky';
 import { toast } from 'sonner';
 
 export function CustomerDetailPage() {
@@ -81,7 +82,6 @@ export function CustomerDetailPage() {
   // Lifetime figures straight from WooCommerce.
   const computedTotalSpent = customer.totalSpent;
   const computedOrdersCount = customer.totalOrders;
-  const aov = computedOrdersCount > 0 ? computedTotalSpent / computedOrdersCount : 0;
 
   const handleSaveAddress = async () => {
     try {
@@ -135,10 +135,11 @@ export function CustomerDetailPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   {customer.firstName} {customer.lastName}
                 </h1>
-                <Badge variant="secondary">{customer.role}</Badge>
+                {customer.role && <Badge variant="secondary">{customer.role}</Badge>}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Customer since {formatDate(customer.registeredDate)} • @{customer.username}
+                Customer since {formatDate(customer.registeredDate)}
+                {customer.username ? ` • @${customer.username}` : ''}
               </p>
             </div>
           </div>
@@ -161,7 +162,7 @@ export function CustomerDetailPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-5 flex items-center justify-between">
             <div>
@@ -173,7 +174,7 @@ export function CustomerDetailPage() {
               </div>
             </div>
             <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <DollarSign className="h-5 w-5" />
+              <IndianRupee className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -190,22 +191,6 @@ export function CustomerDetailPage() {
             </div>
             <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <ShoppingBag className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Average Order Value
-              </span>
-              <div className="text-2xl font-bold text-slate-900 mt-1">
-                {formatCurrency(aov)}
-              </div>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -277,7 +262,7 @@ export function CustomerDetailPage() {
         </div>
 
         {/* Right Column: Address Cards & Notes (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className={`lg:col-span-4 space-y-6 ${STICKY_COLUMN}`}>
           {/* Contact Details */}
           <Card>
             <CardHeader className="pb-3 border-b border-slate-100">

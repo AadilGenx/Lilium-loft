@@ -27,8 +27,8 @@ export type ProductFormValues = z.infer<typeof productSchema>;
 export const couponSchema = z.object({
   code: z.string().min(3, 'Code must be at least 3 characters').toUpperCase(),
   discountType: z.enum(['percent', 'fixed_cart', 'fixed_product']),
-  amount: z.coerce.number().min(1, 'Amount must be greater than 0'),
-  description: z.string().min(3, 'Description is required'),
+  amount: z.coerce.number().gt(0, 'Amount must be greater than 0'),
+  description: z.string().default(''),
   expiryDate: z.string().optional(),
   usageLimit: z.coerce.number().optional(),
   individualUse: z.boolean().default(false),

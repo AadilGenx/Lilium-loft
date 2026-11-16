@@ -62,3 +62,36 @@
   background: #94a3b8;
 }
 
+
+/* Stock-alert button: a short shake every few seconds so the eye is drawn to it. */
+@keyframes stock-alert-shake {
+  0%, 22%, 100% { transform: rotate(0deg) scale(1); }
+  3% { transform: rotate(-16deg) scale(1.12); }
+  6% { transform: rotate(14deg) scale(1.12); }
+  9% { transform: rotate(-12deg) scale(1.1); }
+  12% { transform: rotate(10deg) scale(1.08); }
+  15% { transform: rotate(-6deg) scale(1.04); }
+  18% { transform: rotate(4deg) scale(1.02); }
+}
+
+.stock-alert-shake {
+  transform-origin: 50% 50%;
+  animation: stock-alert-shake 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stock-alert-shake {
+    animation: none;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbars on strips and sticky side panels while keeping them scrollable. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
