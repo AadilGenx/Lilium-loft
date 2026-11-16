@@ -11,6 +11,7 @@ import { ProductsListPage } from '@/pages/products/ProductsListPage';
 import { ProductFormPage } from '@/pages/products/ProductFormPage';
 import { ProductDetailPage } from '@/pages/products/ProductDetailPage';
 import { CategoriesPage } from '@/pages/products/CategoriesPage';
+import { TrashPage } from '@/pages/products/TrashPage';
 import { OrdersListPage } from '@/pages/orders/OrdersListPage';
 import { OrderDetailPage } from '@/pages/orders/OrderDetailPage';
 import { CustomersListPage } from '@/pages/customers/CustomersListPage';
@@ -44,6 +45,7 @@ export function App() {
               <Route path="products/:id" element={<ProductDetailPage />} />
               <Route path="products/:id/edit" element={<ProductFormPage />} />
               <Route path="products/categories" element={<CategoriesPage />} />
+              <Route path="products/trash" element={<TrashPage />} />
 
               {/* 3. Orders */}
               <Route path="orders" element={<OrdersListPage />} />

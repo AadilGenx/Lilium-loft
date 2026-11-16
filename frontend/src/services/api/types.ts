@@ -34,6 +34,7 @@ export interface BackendCategory {
   parent_woo_id: number;
   name: string;
   slug: string;
+  description: string | null;
   products_count: number;
   image_url: string | null;
 }

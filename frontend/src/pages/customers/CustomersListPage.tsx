@@ -14,6 +14,7 @@ import {
   RotateCcw,
   X,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
 import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
+import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
 import { toast } from 'sonner';
 
 export function CustomersListPage() {
@@ -74,6 +76,7 @@ export function CustomersListPage() {
   // Add customer modal
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -427,15 +430,29 @@ export function CustomersListPage() {
                           )}
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-bold text-slate-900">
-                          {formatCurrency(customer.totalSpent)}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-slate-900">
+                            {formatCurrency(customer.totalSpent)}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 font-medium text-[10px] text-slate-700">
+                              {customer.totalOrders} {customer.totalOrders === 1 ? 'order' : 'orders'}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 font-medium text-[10px] text-slate-700">
-                            {customer.totalOrders} {customer.totalOrders === 1 ? 'order' : 'orders'}
-                          </span>
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Delete customer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCustomerToDelete(customer);
+                          }}
+                          className="h-8 w-8 text-slate-400 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                     <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100 text-[11px] text-slate-400">
@@ -459,7 +476,7 @@ export function CustomersListPage() {
                       <TableHead>Registered</TableHead>
                       <TableHead className="text-center">Orders</TableHead>
                       <TableHead className="text-right">Total Spent</TableHead>
-                      <TableHead className="w-12 text-right"></TableHead>
+                      <TableHead className="w-24 text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -496,7 +513,19 @@ export function CustomersListPage() {
                         <TableCell className="text-right font-bold text-slate-900">
                           {formatCurrency(customer.totalSpent)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Delete customer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCustomerToDelete(customer);
+                            }}
+                            className="h-8 w-8 text-slate-400 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                           <ChevronRight className="h-4 w-4 text-slate-400 inline" />
                         </TableCell>
                       </TableRow>
@@ -516,6 +545,8 @@ export function CustomersListPage() {
           />
         </CardContent>
       </Card>
+
+      <DeleteCustomerDialog customer={customerToDelete} onClose={() => setCustomerToDelete(null)} />
 
       {/* Add Customer Modal */}
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>

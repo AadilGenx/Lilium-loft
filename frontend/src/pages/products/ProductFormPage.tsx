@@ -52,7 +52,7 @@ export function ProductFormPage() {
       slug: existingProduct?.slug ?? '',
       sku: existingProduct?.sku ?? '',
       type: existingProduct?.type ?? 'simple',
-      status: existingProduct?.status ?? 'draft',
+      status: existingProduct?.status ?? 'private',
       regularPrice: existingProduct?.regularPrice,
       salePrice: existingProduct?.salePrice,
       manageStock: existingProduct?.manageStock ?? false,
@@ -206,9 +206,9 @@ export function ProductFormPage() {
   };
 
   return (
-    <div className="space-y-6 w-full pb-12">
+    <div className="space-y-6 w-full pb-28 md:pb-12">
       {/* Top Header: stays at the top while the long form scrolls, so Save is always reachable */}
-      <div className="sticky top-0 z-20 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 py-3 bg-slate-50/95 backdrop-blur border-b border-slate-200/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="md:sticky md:top-0 md:z-20 md:-mx-6 lg:-mx-8 md:px-6 lg:px-8 md:py-3 md:bg-slate-50/95 md:backdrop-blur md:border-b md:border-slate-200/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
@@ -230,7 +230,7 @@ export function ProductFormPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="hidden md:flex items-center gap-2 w-full sm:w-auto">
           <Button
             type="button"
             variant="outline"
@@ -582,6 +582,9 @@ export function ProductFormPage() {
                       <SelectItem value="private">Private</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-slate-400">
+                    Private: saved in WooCommerce and visible only to store admins. Draft: not published yet.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">
@@ -640,6 +643,22 @@ export function ProductFormPage() {
           </div>
         </div>
       </form>
+
+      {/* Phones: Cancel / Save always within thumb reach at the bottom of the screen */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-30 flex gap-2 border-t border-slate-200 bg-white/95 backdrop-blur p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <Button type="button" variant="outline" onClick={() => navigate('/products')} className="flex-1 bg-white">
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          onClick={handleSubmit(onSubmit)}
+          disabled={isSubmitting}
+          className="flex-1 gap-1.5 bg-red-600 hover:bg-red-700 text-white"
+        >
+          <Save className="h-4 w-4" />
+          <span>{isEditing ? 'Save Changes' : 'Create Product'}</span>
+        </Button>
+      </div>
     </div>
   );
 }

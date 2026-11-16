@@ -22,6 +22,7 @@ import {
   LogOut,
   ExternalLink,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 import { useUIStore, useBackendSyncStore } from '@/store';
 import { cn } from '@/utils/cn';
@@ -91,6 +92,7 @@ export function Sidebar() {
         { title: 'All Products', href: '/products', icon: Layers },
         { title: 'Add New', href: '/products/new', icon: PlusCircle },
         { title: 'Categories', href: '/products/categories', icon: FolderTree },
+        { title: 'Trash', href: '/products/trash', icon: Trash2 },
       ],
     },
     {
@@ -138,7 +140,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'hidden md:flex flex-col bg-white border-r border-slate-200/80 h-full shrink-0 transition-all duration-300 z-30 select-none',
+        'hidden lg:flex flex-col bg-white border-r border-slate-200/80 h-full shrink-0 transition-all duration-300 z-30 select-none',
         sidebarCollapsed ? 'w-20' : 'w-64'
       )}
     >

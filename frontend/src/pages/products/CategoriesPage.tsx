@@ -3,6 +3,7 @@ import {
   FolderTree,
   Plus,
   Trash2,
+  Pencil,
   Edit2,
   Tag,
   Package,
@@ -14,6 +15,7 @@ import {
   X,
   AlertCircle,
 } from 'lucide-react';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +49,8 @@ import { useCategoryStore } from '@/store';
 import { getErrorMessage } from '@/utils/errors';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { STICKY_COLUMN } from '@/utils/sticky';
+import { EditCategoryDialog } from '@/components/products/EditCategoryDialog';
+import { ProductCategory } from '@/types';
 import { toast } from 'sonner';
 
 export function CategoriesPage() {
@@ -59,6 +63,7 @@ export function CategoriesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [nameError, setNameError] = useState('');
+  const [categoryToEdit, setCategoryToEdit] = useState<ProductCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Filter & Search state
@@ -510,10 +515,19 @@ export function CategoriesPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 font-semibold text-xs border border-red-100">
                               {cat.count} {cat.count === 1 ? 'item' : 'items'}
                             </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCategoryToEdit(cat)}
+                              className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                              title="Edit category"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -579,7 +593,16 @@ export function CategoriesPage() {
                                 {cat.count}
                               </span>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right whitespace-nowrap">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setCategoryToEdit(cat)}
+                                className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                                title="Edit category"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -764,6 +787,8 @@ export function CategoriesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <EditCategoryDialog category={categoryToEdit} onClose={() => setCategoryToEdit(null)} />
 
       <ConfirmDialog
         open={categoryToDelete !== null}

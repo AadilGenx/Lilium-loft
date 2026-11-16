@@ -37,7 +37,20 @@ class ShippingController extends Controller
     )]
     public function zones(): JsonResponse
     {
-        $zones = array_map(fn (array $zone) => $this->withDetails($zone), $this->woo->fetch('shipping/zones'));
+        $zones = $this->woo->fetch('shipping/zones');
+
+        // Every zone's regions and methods are read at the same time, not one after the other.
+        $requests = [];
+        foreach ($zones as $zone) {
+            $requests["l{$zone['id']}"] = "shipping/zones/{$zone['id']}/locations";
+            $requests["m{$zone['id']}"] = "shipping/zones/{$zone['id']}/methods";
+        }
+        $details = $this->woo->fetchMany($requests);
+
+        $zones = array_map(fn (array $zone) => $zone + [
+            'locations' => $details["l{$zone['id']}"] ?? [], // the "rest of the world" zone has no region list
+            'methods' => $details["m{$zone['id']}"] ?? [],
+        ], $zones);
 
         return response()->json(array_values($zones));
     }

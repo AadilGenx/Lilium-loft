@@ -31,13 +31,14 @@ import { htmlToText } from '@/utils/html';
 import { useStockState } from '@/hooks/useStockState';
 import { getErrorMessage } from '@/utils/errors';
 import { STICKY_COLUMN } from '@/utils/sticky';
+import { PageLoading } from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 
 export function ProductDetailPage() {
   const stockOf = useStockState();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { products, deleteProduct, adjustStock } = useProductStore();
+  const { products, deleteProduct, adjustStock, loaded: productsLoaded } = useProductStore();
   const { orders } = useOrderStore();
 
   const product = products.find((p) => p.id === id);
@@ -46,6 +47,8 @@ export function ProductDetailPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [stockInput, setStockInput] = useState(product?.stockQuantity || 0);
+
+  if (!product && !productsLoaded) return <PageLoading label="Loading product..." />;
 
   if (!product) {
     return (
@@ -123,14 +126,14 @@ export function ProductDetailPage() {
                 </Badge>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
-              <span>
-                SKU: <span className="font-mono font-medium text-slate-700">{product.sku}</span>
-              </span>
-              <span>•</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+              {product.sku && (
+                <span>
+                  SKU: <span className="font-mono font-medium text-slate-700">{product.sku}</span>
+                </span>
+              )}
               <span>Created on {formatDate(product.createdAt)}</span>
-              <span>•</span>
-              <span className="text-slate-400">Slug: /{product.slug}</span>
+              <span className="text-slate-400 break-all">Slug: /{product.slug}</span>
             </div>
           </div>
         </div>
@@ -168,14 +171,14 @@ export function ProductDetailPage() {
       </div>
 
       {/* KPI Stats Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Current Price */}
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardContent className="p-4 sm:p-5">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Current Price
             </span>
-            <div className="flex items-baseline gap-2 mt-1">
+            <div className="flex flex-wrap items-baseline gap-x-2 mt-1">
               <span className="text-2xl font-bold text-slate-900">
                 {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
                 {formatMoney(product.price)}
@@ -213,15 +216,15 @@ export function ProductDetailPage() {
             </div>
             <div className="mt-1 flex items-center gap-2">
               {isOutOfStock ? (
-                <Badge variant="destructive">Out of Stock</Badge>
+                <Badge variant="destructive" className="whitespace-nowrap">Out of Stock</Badge>
               ) : stock === 'backorder' ? (
-                <Badge variant="warning">On Backorder</Badge>
+                <Badge variant="warning" className="whitespace-nowrap">On Backorder</Badge>
               ) : isLowStock ? (
-                <Badge variant="warning">Low Stock ({product.stockQuantity} left)</Badge>
+                <Badge variant="warning" className="whitespace-nowrap">Low Stock ({product.stockQuantity} left)</Badge>
               ) : product.manageStock ? (
-                <Badge variant="success">In Stock ({product.stockQuantity} units)</Badge>
+                <Badge variant="success" className="whitespace-nowrap">In Stock ({product.stockQuantity} units)</Badge>
               ) : (
-                <Badge variant="success">In Stock</Badge>
+                <Badge variant="success" className="whitespace-nowrap">In Stock</Badge>
               )}
             </div>
             <span className="text-[11px] text-slate-400 block mt-1">

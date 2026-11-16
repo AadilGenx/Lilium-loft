@@ -206,9 +206,9 @@ export function ShippingPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold truncate">{zone.name}</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5 break-words">
+                      <div className="text-[11px] text-slate-400 mt-0.5 break-words line-clamp-2">
                         {zone.regions.length > 0
-                          ? zone.regions.join(', ')
+                          ? `${zone.regions.slice(0, 6).join(', ')}${zone.regions.length > 6 ? ` +${zone.regions.length - 6} more` : ''}`
                           : 'Locations not covered by your other zones'}
                       </div>
                     </div>
@@ -234,7 +234,7 @@ export function ShippingPage() {
                   {currentZone.name} Methods
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Region coverage: {currentZone.regions.join(', ')}
+                  Region coverage: {currentZone.regions.slice(0, 6).join(', ')}{currentZone.regions.length > 6 ? ` +${currentZone.regions.length - 6} more` : ''}
                 </CardDescription>
               </div>
               <Button

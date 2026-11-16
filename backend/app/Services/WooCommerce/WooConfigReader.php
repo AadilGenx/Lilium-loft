@@ -34,8 +34,62 @@ final class WooConfigReader
         $ttl = (int) config('woocommerce.config_cache_ttl');
 
         return $ttl > 0
-            ? Cache::remember('woo-config:'.$this->generation().':'.md5($endpoint.json_encode($query)), $ttl, $load)
+            ? Cache::remember($this->cacheKey($endpoint, $query), $ttl, $load)
             : $load();
+    }
+
+    /**
+     * Several reads at once. Cached ones are served from the cache; the rest are fetched in parallel.
+     * A WooCommerce 404 gives null for that entry (e.g. a zone without a region list).
+     *
+     * @param  array<string, string>  $endpoints  key => endpoint
+     * @return array<string, array|null>
+     *
+     * @throws UpstreamUnavailable
+     */
+    public function fetchMany(array $endpoints): array
+    {
+        $ttl = (int) config('woocommerce.config_cache_ttl');
+        $out = [];
+        $missing = [];
+
+        foreach ($endpoints as $key => $endpoint) {
+            $hit = $ttl > 0 ? Cache::get($this->cacheKey($endpoint, [])) : null;
+            if (is_array($hit)) {
+                $out[$key] = $hit['missing'] ?? false ? null : $hit['data'];
+            } else {
+                $missing[$key] = $endpoint;
+            }
+        }
+
+        try {
+            $responses = $this->woo->getMany($missing);
+        } catch (WooNotConfigured $e) {
+            throw new UpstreamUnavailable(WooErrors::describe($e, 'read config'));
+        }
+
+        foreach ($missing as $key => $endpoint) {
+            $r = $responses[$key] ?? null;
+
+            if ($r instanceof \Throwable) {
+                throw new UpstreamUnavailable(WooErrors::describe($r, "read {$endpoint}"));
+            }
+            if ($r->status() === 404) {
+                $out[$key] = null;
+                $entry = ['missing' => true, 'data' => null];
+            } elseif ($r->failed()) {
+                throw new UpstreamUnavailable(WooErrors::describe($r->toException() ?? new \RuntimeException('Request failed'), "read {$endpoint}"));
+            } else {
+                $out[$key] = $this->clean($r->json() ?? []);
+                $entry = ['missing' => false, 'data' => $out[$key]];
+            }
+
+            if ($ttl > 0) {
+                Cache::put($this->cacheKey($endpoint, []), $entry, $ttl);
+            }
+        }
+
+        return $out;
     }
 
     /** True when a setting/field id looks like a credential (writes to these are refused). */
@@ -48,6 +102,11 @@ final class WooConfigReader
     public function flush(): void
     {
         Cache::forever('woo-config:generation', $this->generation() + 1);
+    }
+
+    private function cacheKey(string $endpoint, array $query): string
+    {
+        return 'woo-config:'.$this->generation().':'.md5($endpoint.json_encode($query));
     }
 
     private function generation(): int

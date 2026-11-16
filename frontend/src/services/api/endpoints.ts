@@ -101,6 +101,24 @@ export interface ProductQueryParams {
   direction?: 'asc' | 'desc';
 }
 
+export interface BackendTrashedProduct {
+  woo_id: number;
+  name: string;
+  slug: string | null;
+  sku: string | null;
+  type: string;
+  price: string | null;
+  regular_price: string | null;
+  sale_price: string | null;
+  stock_status: string | null;
+  manage_stock: boolean;
+  stock_quantity: number | null;
+  image_url: string | null;
+  categories: string[];
+  trashed_at: string | null;
+  previous_status: 'publish' | 'draft' | 'pending' | 'private' | null;
+}
+
 export const productsApi = {
   async list(params: ProductQueryParams = {}): Promise<BackendPagination<BackendProduct>> {
     const searchParams = new URLSearchParams();
@@ -123,6 +141,16 @@ export const productsApi = {
 
   async create(payload: Record<string, unknown>): Promise<BackendProduct> {
     return apiClient<BackendProduct>('/products', { method: 'POST', body: json(payload) });
+  },
+
+  /** The WooCommerce trash, read live. */
+  async trash(): Promise<{ data: BackendTrashedProduct[] }> {
+    return apiClient<{ data: BackendTrashedProduct[] }>('/products/trash');
+  },
+
+  /** Takes a product out of the trash. `status` is only needed when the status it had is not known. */
+  async restore(wooId: number, status?: string): Promise<unknown> {
+    return apiClient(`/products/trash/${wooId}/restore`, { method: 'POST', body: json(status ? { status } : {}) });
   },
 
   async update(id: number | string, payload: Record<string, unknown>): Promise<BackendProduct> {
@@ -251,6 +279,10 @@ export const categoriesApi = {
 
   async create(payload: Record<string, unknown>): Promise<BackendCategory> {
     return apiClient<BackendCategory>('/categories', { method: 'POST', body: json(payload) });
+  },
+
+  async update(id: number | string, payload: Record<string, unknown>): Promise<BackendCategory> {
+    return apiClient<BackendCategory>(`/categories/${id}`, { method: 'PATCH', body: json(payload) });
   },
 
   async remove(id: number | string): Promise<void> {

@@ -4,6 +4,8 @@ namespace App\Services\WooCommerce;
 
 use Generator;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -41,6 +43,35 @@ final class WooClient
         $response->throw();
 
         return $response->json() ?? [];
+    }
+
+    /**
+     * Several GET requests at the same time (one round trip's worth of waiting instead of one per request).
+     *
+     * @param  array<string, string>  $endpoints  key => endpoint
+     * @return array<string, Response|\Throwable>  key => response (not thrown, so the caller can handle each)
+     */
+    public function getMany(array $endpoints): array
+    {
+        if ($endpoints === []) {
+            return [];
+        }
+
+        $this->http(); // fail early (not configured) before any request is made
+
+        $caBundle = config('woocommerce.ca_bundle');
+
+        return Http::pool(function (Pool $pool) use ($endpoints, $caBundle) {
+            foreach ($endpoints as $key => $endpoint) {
+                $pool->as((string) $key)
+                    ->baseUrl(config('woocommerce.base_url').'/wp-json/wc/v3')
+                    ->withOptions($caBundle ? ['verify' => $caBundle] : [])
+                    ->withBasicAuth(config('woocommerce.consumer_key'), config('woocommerce.consumer_secret'))
+                    ->acceptJson()
+                    ->timeout(config('woocommerce.timeout'))
+                    ->get(ltrim($endpoint, '/'));
+            }
+        });
     }
 
     /**

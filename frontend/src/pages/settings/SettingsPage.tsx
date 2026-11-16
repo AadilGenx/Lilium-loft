@@ -28,7 +28,7 @@ import { useSettingsStore } from '@/store';
 import { StoreChangesPanel } from '@/components/settings/StoreChangesPanel';
 import { BackendSetting } from '@/services/api';
 import { getErrorMessage } from '@/utils/errors';
-import { decodeHtml } from '@/utils/html';
+import { htmlToText, decodeHtml } from '@/utils/html';
 import { toast } from 'sonner';
 
 /** Groups the backend allows changing; everything else (API keys, webhooks, ...) stays in WooCommerce. */
@@ -120,7 +120,7 @@ export function SettingsPage() {
     try {
       await saveGroup(groupId, changes);
       setDrafts((d) => ({ ...d, [groupId]: {} }));
-      toast.success(`${tabs.find((t) => t.id === groupId)?.label ?? groupId} settings saved.`);
+      toast.success(`${htmlToText(tabs.find((t) => t.id === groupId)?.label ?? groupId)} settings saved.`);
     } catch (err) {
       toast.error(getErrorMessage(err));
     } finally {
@@ -136,8 +136,8 @@ export function SettingsPage() {
       return (
         <div key={s.id} className="flex items-center justify-between gap-4">
           <div>
-            <div className="font-semibold text-slate-800">{decodeHtml(s.label)}</div>
-            {s.description && <div className="text-slate-400">{decodeHtml(s.description)}</div>}
+            <div className="font-semibold text-slate-800">{htmlToText(s.label)}</div>
+            {s.description && <div className="text-slate-400">{htmlToText(s.description)}</div>}
           </div>
           <Switch
             checked={typeof value === 'boolean' ? value : value === 'yes'}
@@ -149,7 +149,7 @@ export function SettingsPage() {
 
     return (
       <div key={s.id} className="space-y-1.5">
-        <label className="font-semibold text-slate-700">{decodeHtml(s.label)}</label>
+        <label className="font-semibold text-slate-700">{htmlToText(s.label)}</label>
         {s.type === 'textarea' ? (
           <Textarea
             rows={3}
@@ -167,7 +167,7 @@ export function SettingsPage() {
             <SelectContent>
               {Object.entries(s.options).map(([key, label]) => (
                 <SelectItem key={key || EMPTY} value={key === '' ? EMPTY : key}>
-                  {decodeHtml(label)}
+                  {htmlToText(label)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -180,7 +180,7 @@ export function SettingsPage() {
           />
         )}
         {(s.description || s.tip) && (
-          <span className="text-[11px] text-slate-400">{decodeHtml(s.description || s.tip)}</span>
+          <span className="text-[11px] text-slate-400">{htmlToText(s.description || s.tip)}</span>
         )}
       </div>
     );
@@ -211,7 +211,7 @@ export function SettingsPage() {
                   className="gap-1.5 text-xs shrink-0 py-2 px-3 whitespace-nowrap"
                 >
                   <Icon className="h-3.5 w-3.5" />
-                  <span>{g.label}</span>
+                  <span>{htmlToText(g.label)}</span>
                 </TabsTrigger>
               );
             })}
@@ -238,9 +238,9 @@ export function SettingsPage() {
                 <Card>
                   <CardHeader className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                      <CardTitle className="text-base font-semibold">{g.label}</CardTitle>
+                      <CardTitle className="text-base font-semibold">{htmlToText(g.label)}</CardTitle>
                       {g.description && (
-                        <CardDescription className="text-xs">{g.description}</CardDescription>
+                        <CardDescription className="text-xs">{htmlToText(g.description)}</CardDescription>
                       )}
                     </div>
                     <Button
@@ -250,7 +250,7 @@ export function SettingsPage() {
                       className="gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs self-start sm:self-auto"
                     >
                       <Save className="h-3.5 w-3.5" />
-                      <span>Save {g.label}</span>
+                      <span>Save {htmlToText(g.label)}</span>
                     </Button>
                   </CardHeader>
                   <CardContent className="pt-5 space-y-5 text-xs">
@@ -269,12 +269,12 @@ export function SettingsPage() {
                         </div>
                         {readOnly.map((s) => (
                           <div key={s.id} className="flex items-center justify-between gap-4 text-slate-500">
-                            <span>{decodeHtml(s.label)}</span>
+                            <span>{htmlToText(s.label)}</span>
                             <span className="text-slate-400 truncate max-w-[50%]">
                               {Array.isArray(s.value)
-                                ? s.value.map((v) => decodeHtml(String(v))).join(', ')
+                                ? s.value.map((v) => htmlToText(String(v))).join(', ')
                                 : typeof s.value === 'string'
-                                ? decodeHtml(s.value)
+                                ? htmlToText(s.value)
                                 : ''}
                             </span>
                           </div>

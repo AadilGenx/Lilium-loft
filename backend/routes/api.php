@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\Write\CouponWriteController;
 use App\Http\Controllers\Api\Write\CustomerWriteController;
 use App\Http\Controllers\Api\Write\OrderWriteController;
 use App\Http\Controllers\Api\Write\PaymentGatewayWriteController;
+use App\Http\Controllers\Api\Write\ProductTrashController;
 use App\Http\Controllers\Api\Write\ProductWriteController;
 use App\Http\Controllers\Api\Write\SettingsWriteController;
 use App\Http\Controllers\Api\Write\ShippingWriteController;
@@ -48,6 +49,7 @@ Route::prefix('v1')->group(function () {
         Route::get('orders/{id}', [OrderController::class, 'show'])->whereNumber('id');
         Route::get('orders/{id}/notes', [OrderWriteController::class, 'notes'])->whereNumber('id');
         Route::get('orders/{id}/refunds', [OrderWriteController::class, 'refunds'])->whereNumber('id');
+        Route::get('products/trash', [ProductTrashController::class, 'index']);
         Route::get('products', [ProductController::class, 'index']);
         Route::get('products/{id}', [ProductController::class, 'show'])->whereNumber('id');
         Route::get('customers', [CustomerController::class, 'index']);
@@ -93,6 +95,7 @@ Route::prefix('v1')->group(function () {
             ->whereNumber('id')
             ->middleware('woo.write:products.update');
         Route::post('products', [ProductWriteController::class, 'store'])->middleware('woo.write:products.create');
+        Route::post('products/trash/{wooId}/restore', [ProductTrashController::class, 'restore'])->whereNumber('wooId')->middleware('woo.write:products.delete');
         Route::delete('products/{id}', [ProductWriteController::class, 'destroy'])->whereNumber('id')->middleware('woo.write:products.delete');
 
         Route::put('orders/{id}/status', [OrderWriteController::class, 'status'])->whereNumber('id')->middleware('woo.write:orders.update');

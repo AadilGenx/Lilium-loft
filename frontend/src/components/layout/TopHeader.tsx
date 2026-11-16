@@ -38,7 +38,7 @@ export function TopHeader() {
       <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-md min-w-0">
         <button
           onClick={() => setMobileMenuOpen(true)}
-          className="md:hidden p-2 -ml-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+          className="lg:hidden p-2 -ml-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 shrink-0"
         >
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle Menu</span>
@@ -81,6 +81,18 @@ export function TopHeader() {
         >
           <Plus className="h-4 w-4" />
           <span>Add Product</span>
+        </Button>
+
+        <Button
+          onClick={handleManualSync}
+          disabled={status === 'syncing'}
+          variant="ghost"
+          size="icon"
+          className="sm:hidden text-slate-600 hover:text-slate-900"
+          title="Import the latest from WooCommerce"
+        >
+          <RefreshCw className={`h-5 w-5 ${status === 'syncing' ? 'animate-spin' : ''}`} />
+          <span className="sr-only">Sync</span>
         </Button>
 
         <div className="h-4 w-px bg-slate-200 hidden sm:block" />

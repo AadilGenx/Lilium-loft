@@ -12,6 +12,7 @@ import {
   Edit,
   ExternalLink,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,14 +39,17 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
 import { STICKY_COLUMN } from '@/utils/sticky';
+import { PageLoading } from '@/components/ui/page-loading';
+import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
 import { toast } from 'sonner';
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { customers, updateCustomerAddress } = useCustomerStore();
+  const { customers, updateCustomerAddress, loaded: customersLoaded } = useCustomerStore();
   const { orders } = useOrderStore();
 
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const customer = customers.find((c) => c.id === id);
   const customerOrders = orders.filter(
     (o) =>
@@ -69,6 +73,8 @@ export function CustomerDetailPage() {
       phone: '',
     }
   );
+
+  if (!customer && !customersLoaded) return <PageLoading label="Loading customer..." />;
 
   if (!customer) {
     return (
@@ -175,13 +181,22 @@ export function CustomerDetailPage() {
             <Edit className="h-4 w-4" />
             <span>Edit Addresses</span>
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            className="gap-1.5 bg-white text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Delete</span>
+          </Button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-2">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Lifetime Value (LTV)
@@ -197,7 +212,7 @@ export function CustomerDetailPage() {
         </Card>
 
         <Card>
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-2">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Total Orders
@@ -517,6 +532,11 @@ export function CustomerDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DeleteCustomerDialog
+        customer={deleteOpen ? customer ?? null : null}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={() => navigate('/customers')}
+      />
     </div>
   );
 }

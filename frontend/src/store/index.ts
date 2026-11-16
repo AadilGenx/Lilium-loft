@@ -166,6 +166,8 @@ function buildProductPayload(next: ProductInput, prev: Product | null, categorie
 interface ProductStore {
   products: Product[];
   isLoading: boolean;
+  /** True once the first load has finished (so a page can tell "still loading" from "not found"). */
+  loaded: boolean;
   error: string | null;
   fetchProducts: (opts?: FetchOptions) => Promise<void>;
   /** Returns the new product's id (null if the backend could not give one yet). */
@@ -178,15 +180,17 @@ interface ProductStore {
 export const useProductStore = create<ProductStore>((set, get) => ({
   products: [],
   isLoading: false,
+  loaded: false,
   error: null,
   fetchProducts: async ({ silent = false } = {}) => {
     if (!silent) set({ isLoading: true, error: null });
     try {
       const rows = await fetchAllPages((page) => productsApi.list({ per_page: 100, page }));
       const products = keepUnchanged(get().products, rows.map(mapBackendProduct));
-      set(silent ? { products } : { products, isLoading: false });
+      set(silent ? { products, loaded: true } : { products, isLoading: false, loaded: true });
     } catch (err) {
       console.warn('Failed to fetch products:', err);
+      set({ loaded: true });
       if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch products') });
     }
   },
@@ -230,6 +234,7 @@ export const useProductStore = create<ProductStore>((set, get) => ({
 interface OrderStore {
   orders: Order[];
   isLoading: boolean;
+  loaded: boolean;
   error: string | null;
   fetchOrders: (opts?: FetchOptions) => Promise<void>;
   /** Loads the notes and refunds recorded in WooCommerce for one order. */
@@ -250,6 +255,7 @@ export const useOrderStore = create<OrderStore>((set, get) => {
   return {
     orders: [],
     isLoading: false,
+    loaded: false,
     error: null,
     fetchOrders: async ({ silent = false } = {}) => {
       if (!silent) set({ isLoading: true, error: null });
@@ -262,9 +268,10 @@ export const useOrderStore = create<OrderStore>((set, get) => {
           return prev ? { ...o, notes: prev.notes, refunds: prev.refunds } : o;
         });
         const merged = keepUnchanged(get().orders, orders);
-        set(silent ? { orders: merged } : { orders: merged, isLoading: false });
+        set(silent ? { orders: merged, loaded: true } : { orders: merged, isLoading: false, loaded: true });
       } catch (err) {
         console.warn('Failed to fetch orders:', err);
+        set({ loaded: true });
         if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch orders') });
       }
     },
@@ -342,6 +349,7 @@ const customerPayload = (c: CustomerInput): Record<string, unknown> => {
 interface CustomerStore {
   customers: Customer[];
   isLoading: boolean;
+  loaded: boolean;
   error: string | null;
   fetchCustomers: (opts?: FetchOptions) => Promise<void>;
   createCustomer: (input: CustomerInput) => Promise<string | null>;
@@ -352,15 +360,17 @@ interface CustomerStore {
 export const useCustomerStore = create<CustomerStore>((set, get) => ({
   customers: [],
   isLoading: false,
+  loaded: false,
   error: null,
   fetchCustomers: async ({ silent = false } = {}) => {
     if (!silent) set({ isLoading: true, error: null });
     try {
       const rows = await fetchAllPages((page) => customersApi.list({ per_page: 100, page }));
       const customers = keepUnchanged(get().customers, rows.map(mapBackendCustomer));
-      set(silent ? { customers } : { customers, isLoading: false });
+      set(silent ? { customers, loaded: true } : { customers, isLoading: false, loaded: true });
     } catch (err) {
       console.warn('Failed to fetch customers:', err);
+      set({ loaded: true });
       if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch customers') });
     }
   },
@@ -398,6 +408,8 @@ interface CategoryStore {
   error: string | null;
   fetchCategories: (opts?: FetchOptions) => Promise<void>;
   createCategory: (input: { name: string; slug?: string; description?: string; image?: string }) => Promise<void>;
+  /** Only the fields in `changes` are sent to WooCommerce. */
+  updateCategory: (id: string, changes: { name?: string; slug?: string; description?: string; image?: string }) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 }
 
@@ -422,6 +434,10 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     if (description) payload.description = description;
     if (image) payload.image = image;
     await categoriesApi.create(payload);
+    await get().fetchCategories();
+  },
+  updateCategory: async (id, changes) => {
+    await categoriesApi.update(id, changes);
     await get().fetchCategories();
   },
   deleteCategory: async (id) => {
@@ -745,9 +761,9 @@ export interface BackendSyncState {
 
 /** Empty every store, so nothing from a previous session can show up. */
 const clearAllData = () => {
-  useProductStore.setState({ products: [], error: null });
-  useOrderStore.setState({ orders: [], error: null });
-  useCustomerStore.setState({ customers: [], error: null });
+  useProductStore.setState({ products: [], error: null, loaded: false });
+  useOrderStore.setState({ orders: [], error: null, loaded: false });
+  useCustomerStore.setState({ customers: [], error: null, loaded: false });
   useCategoryStore.setState({ categories: [], error: null });
   useCouponStore.setState({ coupons: [], error: null });
   useShippingStore.setState({ shippingZones: [], error: null });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -18,6 +18,7 @@ import {
   Layers,
   PlusCircle,
   FolderTree,
+  Trash2,
 } from 'lucide-react';
 import { useUIStore } from '@/store';
 import { cn } from '@/utils/cn';
@@ -25,6 +26,14 @@ import { cn } from '@/utils/cn';
 export function MobileNav() {
   const { mobileMenuOpen, setMobileMenuOpen } = useUIStore();
   const location = useLocation();
+
+  // Escape closes the menu (keyboard and screen-reader users could not dismiss it before).
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMobileMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileMenuOpen, setMobileMenuOpen]);
   const [productsOpen, setProductsOpen] = useState(
     location.pathname.startsWith('/products')
   );
@@ -41,6 +50,7 @@ export function MobileNav() {
         { title: 'All Products', href: '/products', icon: Layers },
         { title: 'Add New', href: '/products/new', icon: PlusCircle },
         { title: 'Categories', href: '/products/categories', icon: FolderTree },
+        { title: 'Trash', href: '/products/trash', icon: Trash2 },
       ],
     },
     { title: 'Orders', href: '/orders', icon: ShoppingCart },
@@ -54,7 +64,7 @@ export function MobileNav() {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 md:hidden">
+    <div className="fixed inset-0 z-50 lg:hidden">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in"
