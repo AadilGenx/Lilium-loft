@@ -28,6 +28,7 @@ import { useSettingsStore } from '@/store';
 import { StoreChangesPanel } from '@/components/settings/StoreChangesPanel';
 import { BackendSetting } from '@/services/api';
 import { getErrorMessage } from '@/utils/errors';
+import { decodeHtml } from '@/utils/html';
 import { toast } from 'sonner';
 
 /** Groups the backend allows changing; everything else (API keys, webhooks, ...) stays in WooCommerce. */
@@ -64,7 +65,17 @@ const currentValue = (s: BackendSetting, draft: Draft): string | boolean => {
 export function SettingsPage() {
   const { groups, settings, isLoading, fetchGroups, fetchGroup, saveGroup } = useSettingsStore();
 
-  const tabs = useMemo(() => groups.filter((g) => EDITABLE_GROUPS.includes(g.id)), [groups]);
+  const tabs = useMemo(
+    () =>
+      groups
+        .filter((g) => EDITABLE_GROUPS.includes(g.id))
+        .map((g) => ({
+          ...g,
+          label: decodeHtml(g.label),
+          description: g.description ? decodeHtml(g.description) : g.description,
+        })),
+    [groups]
+  );
   const [activeTab, setActiveTab] = useState('');
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [saving, setSaving] = useState(false);
@@ -125,8 +136,8 @@ export function SettingsPage() {
       return (
         <div key={s.id} className="flex items-center justify-between gap-4">
           <div>
-            <div className="font-semibold text-slate-800">{s.label}</div>
-            {s.description && <div className="text-slate-400">{s.description}</div>}
+            <div className="font-semibold text-slate-800">{decodeHtml(s.label)}</div>
+            {s.description && <div className="text-slate-400">{decodeHtml(s.description)}</div>}
           </div>
           <Switch
             checked={typeof value === 'boolean' ? value : value === 'yes'}
@@ -138,7 +149,7 @@ export function SettingsPage() {
 
     return (
       <div key={s.id} className="space-y-1.5">
-        <label className="font-semibold text-slate-700">{s.label}</label>
+        <label className="font-semibold text-slate-700">{decodeHtml(s.label)}</label>
         {s.type === 'textarea' ? (
           <Textarea
             rows={3}
@@ -156,7 +167,7 @@ export function SettingsPage() {
             <SelectContent>
               {Object.entries(s.options).map(([key, label]) => (
                 <SelectItem key={key || EMPTY} value={key === '' ? EMPTY : key}>
-                  {label}
+                  {decodeHtml(label)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -169,7 +180,7 @@ export function SettingsPage() {
           />
         )}
         {(s.description || s.tip) && (
-          <span className="text-[11px] text-slate-400">{s.description || s.tip}</span>
+          <span className="text-[11px] text-slate-400">{decodeHtml(s.description || s.tip)}</span>
         )}
       </div>
     );
@@ -188,21 +199,31 @@ export function SettingsPage() {
       </div>
 
       <Tabs value={activeTab || STORE_CHANGES} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-slate-100 p-1 flex-wrap h-auto gap-1">
+        {/* Horizontal scrollable tabs container for mobile, tablet, and small screens */}
+        <div className="w-full overflow-x-auto pb-1.5 -mx-1 px-1 sm:mx-0 sm:px-0">
+          <TabsList className="bg-slate-100 p-1 inline-flex w-max min-w-full sm:min-w-0 justify-start gap-1 h-auto flex-nowrap">
             {tabs.map((g) => {
               const Icon = GROUP_ICONS[g.id] ?? Settings;
               return (
-                <TabsTrigger key={g.id} value={g.id} className="gap-1.5 text-xs">
+                <TabsTrigger
+                  key={g.id}
+                  value={g.id}
+                  className="gap-1.5 text-xs shrink-0 py-2 px-3 whitespace-nowrap"
+                >
                   <Icon className="h-3.5 w-3.5" />
                   <span>{g.label}</span>
                 </TabsTrigger>
               );
             })}
-            <TabsTrigger value={STORE_CHANGES} className="gap-1.5 text-xs">
+            <TabsTrigger
+              value={STORE_CHANGES}
+              className="gap-1.5 text-xs shrink-0 py-2 px-3 whitespace-nowrap"
+            >
               <ShieldCheck className="h-3.5 w-3.5" />
               <span>Store changes</span>
             </TabsTrigger>
           </TabsList>
+        </div>
 
           <TabsContent value={STORE_CHANGES} className="mt-0">
             <StoreChangesPanel />
@@ -248,9 +269,13 @@ export function SettingsPage() {
                         </div>
                         {readOnly.map((s) => (
                           <div key={s.id} className="flex items-center justify-between gap-4 text-slate-500">
-                            <span>{s.label}</span>
+                            <span>{decodeHtml(s.label)}</span>
                             <span className="text-slate-400 truncate max-w-[50%]">
-                              {Array.isArray(s.value) ? s.value.join(', ') : typeof s.value === 'string' ? s.value : ''}
+                              {Array.isArray(s.value)
+                                ? s.value.map((v) => decodeHtml(String(v))).join(', ')
+                                : typeof s.value === 'string'
+                                ? decodeHtml(s.value)
+                                : ''}
                             </span>
                           </div>
                         ))}

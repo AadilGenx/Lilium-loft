@@ -12,11 +12,13 @@ import {
   RotateCcw,
   XCircle,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { FilterModal } from '@/components/ui/filter-modal';
 import {
   Table,
   TableBody,
@@ -48,7 +50,24 @@ export function OrdersListPage() {
   // Same rolling window the dashboard uses, so the two can be compared directly.
   const [period, setPeriod] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const pageSize = 8;
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() || selectedStatus !== 'all' || period !== 'all'
+  );
+
+  const activeFilterCount =
+    (selectedStatus !== 'all' ? 1 : 0) +
+    (period !== 'all' ? 1 : 0) +
+    (searchTerm.trim() ? 1 : 0);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedStatus('all');
+    setPeriod('all');
+    setCurrentPage(1);
+  };
 
   // Status Counts
   const counts = useMemo(() => {
@@ -204,8 +223,70 @@ export function OrdersListPage() {
 
       {/* Search & Secondary Filter */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
+        <CardContent className="p-3 sm:p-4">
+          {/* Mobile & Tablet: Search + Filter button + Clear button */}
+          <div className="flex lg:hidden items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search orders, customers, or email..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9 pr-8 bg-slate-50/50 text-xs sm:text-sm h-9"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              variant={activeFilterCount > 0 ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterModalOpen(true)}
+              className={`h-9 px-3 gap-1.5 shrink-0 ${
+                activeFilterCount > 0
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-white text-slate-700 border-slate-200'
+              }`}
+            >
+              <Filter className="h-4 w-4" />
+              <span className="text-xs font-medium">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-red-600 text-[10px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="h-9 px-2 text-slate-500 hover:text-red-600 hover:bg-red-50 shrink-0"
+                title="Clear all filters"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Desktop View: Full Search & Dropdowns */}
+          <div className="hidden lg:flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <Input
@@ -215,10 +296,22 @@ export function OrdersListPage() {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-9 bg-slate-50/50"
+                className="pl-9 pr-8 bg-slate-50/50"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
-            <div className="w-full sm:w-48">
+            <div className="w-48">
               <Select
                 value={selectedStatus}
                 onValueChange={(val) => {
@@ -240,7 +333,7 @@ export function OrdersListPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full sm:w-44">
+            <div className="w-44 flex items-center gap-2">
               <Select
                 value={period}
                 onValueChange={(val) => {
@@ -248,7 +341,7 @@ export function OrdersListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="bg-slate-50/50">
+                <SelectTrigger className="bg-slate-50/50 flex-1">
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,10 +351,96 @@ export function OrdersListPage() {
                   <SelectItem value="90">Last 90 days</SelectItem>
                 </SelectContent>
               </Select>
+
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="h-10 px-3 text-xs text-slate-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 shrink-0 gap-1"
+                  title="Clear all filters"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Clear</span>
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Mobile/Tablet Filter Modal */}
+      <FilterModal
+        open={filterModalOpen}
+        onOpenChange={setFilterModalOpen}
+        title="Filter Orders"
+        activeCount={activeFilterCount}
+        onClear={handleClearFilters}
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Search Query</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Order #, customer name, email..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Order Status</label>
+            <Select
+              value={selectedStatus}
+              onValueChange={(val) => {
+                setSelectedStatus(val);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="on-hold">On-Hold</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="refunded">Refunded</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Date Period</label>
+            <Select
+              value={period}
+              onValueChange={(val) => {
+                setPeriod(val);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All time" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </FilterModal>
 
       {/* What the current list adds up to */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-xs text-slate-500">
@@ -294,58 +473,113 @@ export function OrdersListPage() {
               />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-24">Order</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="w-12 text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile & Tablet Card View (< lg) */}
+              <div className="lg:hidden p-3 sm:p-4 space-y-3 bg-slate-50/40">
                 {paginatedOrders.map((order) => (
-                  <TableRow
+                  <div
                     key={order.id}
                     onClick={() => navigate(`/orders/${order.id}`)}
-                    className="cursor-pointer hover:bg-slate-50/80 transition-colors"
+                    className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-white shadow-sm hover:border-slate-300 hover:shadow cursor-pointer transition-all space-y-2.5"
                   >
-                    <TableCell className="font-bold text-slate-900 font-mono">
-                      {order.orderNumber}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-500">
-                      {formatDate(order.dateCreated)}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(order.status)}</TableCell>
-                    <TableCell>
-                      <div className="font-medium text-slate-800 text-xs">
-                        {order.customerName}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 font-mono text-sm">
+                          #{order.orderNumber}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-xs text-slate-500">
+                          {formatDate(order.dateCreated)}
+                        </span>
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        {order.customerEmail}
+                      {getStatusBadge(order.status)}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <div>
+                        <span className="font-medium text-slate-800 block">{order.customerName}</span>
+                        <span className="text-[11px] text-slate-400 block truncate max-w-[200px]">
+                          {order.customerEmail}
+                        </span>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-600">
-                      {order.items.length}{' '}
-                      {order.items.length === 1 ? 'item' : 'items'}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-600">
-                      {order.paymentMethodTitle}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-slate-900">
-                      {formatCurrency(order.total, order.currency)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <ChevronRight className="h-4 w-4 text-slate-400 inline" />
-                    </TableCell>
-                  </TableRow>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-slate-900 block">
+                          {formatCurrency(order.total, order.currency)}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                      <span className="text-slate-400">
+                        Payment: <span className="text-slate-700 font-medium">{order.paymentMethodTitle || 'Standard'}</span>
+                      </span>
+                      <span className="flex items-center gap-0.5 text-red-600 font-medium">
+                        Details <ChevronRight className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop Table View (lg and above) */}
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-24">Order</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Payment Method</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="w-12 text-right"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedOrders.map((order) => (
+                      <TableRow
+                        key={order.id}
+                        onClick={() => navigate(`/orders/${order.id}`)}
+                        className="cursor-pointer hover:bg-slate-50/80 transition-colors"
+                      >
+                        <TableCell className="font-bold text-slate-900 font-mono">
+                          {order.orderNumber}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500">
+                          {formatDate(order.dateCreated)}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        <TableCell>
+                          <div className="font-medium text-slate-800 text-xs">
+                            {order.customerName}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {order.customerEmail}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {order.items.length}{' '}
+                          {order.items.length === 1 ? 'item' : 'items'}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600">
+                          {order.paymentMethodTitle}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-900">
+                          {formatCurrency(order.total, order.currency)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <ChevronRight className="h-4 w-4 text-slate-400 inline" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           <Pagination

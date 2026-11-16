@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   Download,
   ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -79,6 +80,7 @@ export function PaymentsPage() {
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formInstructions, setFormInstructions] = useState('');
+  const [titleError, setTitleError] = useState('');
 
   useEffect(() => {
     fetchGateways();
@@ -89,10 +91,16 @@ export function PaymentsPage() {
     setFormTitle(g.title);
     setFormDesc(g.description);
     setFormInstructions(g.instructions || '');
+    setTitleError('');
   };
 
   const handleSaveConfig = async () => {
     if (!configModalGateway) return;
+    if (!formTitle.trim()) {
+      setTitleError('Display title is required.');
+      return;
+    }
+    setTitleError('');
     setSaving(true);
     try {
       await updateGateway(configModalGateway.id, {
@@ -281,53 +289,95 @@ export function PaymentsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto w-full">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Reference ID</TableHead>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Gateway</TableHead>
-                      <TableHead>Order Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center text-xs text-slate-400 py-8">
-                          No transactions yet.
-                        </TableCell>
-                      </TableRow>
-                    )}
+              {transactions.length === 0 ? (
+                <div className="text-center text-xs text-slate-400 py-8">
+                  No transactions yet.
+                </div>
+              ) : (
+                <>
+                  {/* Mobile & Tablet Card View (< lg) */}
+                  <div className="lg:hidden p-3 sm:p-4 space-y-3 bg-slate-50/40">
                     {transactions.map((tx) => (
-                      <TableRow key={tx.id}>
-                        <TableCell className="font-mono text-xs text-slate-700 whitespace-nowrap">
-                          {tx.transactionReference || '—'}
-                        </TableCell>
-                        <TableCell className="font-bold font-mono text-xs text-slate-900 whitespace-nowrap">
-                          {tx.orderNumber}
-                        </TableCell>
-                        <TableCell className="text-xs font-medium text-slate-800 whitespace-nowrap">
-                          {tx.customerName}
-                        </TableCell>
-                        <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                          {tx.paymentMethod}
-                        </TableCell>
-                        <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                      <div
+                        key={tx.id}
+                        className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-white shadow-sm hover:border-slate-300 transition-all space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold font-mono text-xs text-slate-900">
+                            {tx.orderNumber}
+                          </span>
+                          {getStatusBadge(tx.status)}
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <div>
+                            <span className="font-medium text-slate-800 block">
+                              {tx.customerName}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              Ref: {tx.transactionReference || '—'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-slate-900 text-sm block">
+                              {formatCurrency(tx.amount, tx.currency)}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {tx.paymentMethod}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-1.5 border-t border-slate-100 text-[11px] text-slate-400">
                           {formatDateTime(tx.date)}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(tx.status)}</TableCell>
-                        <TableCell className="text-right font-bold text-slate-900 whitespace-nowrap">
-                          {formatCurrency(tx.amount, tx.currency)}
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+
+                  {/* Desktop Table View (lg and above) */}
+                  <div className="hidden lg:block overflow-x-auto w-full">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Reference ID</TableHead>
+                          <TableHead>Order</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Gateway</TableHead>
+                          <TableHead>Order Date</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((tx) => (
+                          <TableRow key={tx.id}>
+                            <TableCell className="font-mono text-xs text-slate-700 whitespace-nowrap">
+                              {tx.transactionReference || '—'}
+                            </TableCell>
+                            <TableCell className="font-bold font-mono text-xs text-slate-900 whitespace-nowrap">
+                              {tx.orderNumber}
+                            </TableCell>
+                            <TableCell className="text-xs font-medium text-slate-800 whitespace-nowrap">
+                              {tx.customerName}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                              {tx.paymentMethod}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                              {formatDateTime(tx.date)}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(tx.status)}</TableCell>
+                            <TableCell className="text-right font-bold text-slate-900 whitespace-nowrap">
+                              {formatCurrency(tx.amount, tx.currency)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -351,11 +401,21 @@ export function PaymentsPage() {
 
             <div className="space-y-4 py-2 text-xs">
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Display Title</label>
+                <label className="font-semibold text-slate-700">Display Title <span className="text-red-500">*</span></label>
                 <Input
                   value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
+                  onChange={(e) => {
+                    setFormTitle(e.target.value);
+                    if (titleError) setTitleError('');
+                  }}
+                  className={titleError ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
+                {titleError && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{titleError}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">

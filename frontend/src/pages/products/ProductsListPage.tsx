@@ -13,10 +13,13 @@ import {
   Package,
   Layers,
   CheckCircle,
+  RotateCcw,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { FilterModal } from '@/components/ui/filter-modal';
 import {
   Table,
   TableBody,
@@ -63,7 +66,29 @@ export function ProductsListPage() {
   const [selectedStock, setSelectedStock] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const pageSize = 8;
+
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    selectedCategory !== 'all' ||
+    selectedStock !== 'all' ||
+    selectedType !== 'all'
+  );
+
+  const activeFilterCount =
+    (selectedCategory !== 'all' ? 1 : 0) +
+    (selectedStock !== 'all' ? 1 : 0) +
+    (selectedType !== 'all' ? 1 : 0) +
+    (searchTerm.trim() ? 1 : 0);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('all');
+    setSelectedStock('all');
+    setSelectedType('all');
+    setCurrentPage(1);
+  };
 
   // Delete modal state
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -189,8 +214,70 @@ export function ProductsListPage() {
 
       {/* Filter and Search Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <CardContent className="p-3 sm:p-4">
+          {/* Mobile & Tablet: Search + Filter Button + Clear Button */}
+          <div className="flex lg:hidden items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by name or SKU..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9 pr-8 bg-slate-50/50 text-xs sm:text-sm h-9"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              variant={activeFilterCount > 0 ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterModalOpen(true)}
+              className={`h-9 px-3 gap-1.5 shrink-0 ${
+                activeFilterCount > 0
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-white text-slate-700 border-slate-200'
+              }`}
+            >
+              <Filter className="h-4 w-4" />
+              <span className="text-xs font-medium">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-red-600 text-[10px] font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="h-9 px-2 text-slate-500 hover:text-red-600 hover:bg-red-50 shrink-0"
+                title="Clear all filters"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {/* Desktop View: Full 4-Column Filter Grid */}
+          <div className="hidden lg:grid grid-cols-4 gap-3">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -201,8 +288,20 @@ export function ProductsListPage() {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="pl-9 bg-slate-50/50"
+                className="pl-9 pr-8 bg-slate-50/50"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Category Filter */}
@@ -247,6 +346,114 @@ export function ProductsListPage() {
             </Select>
 
             {/* Product Type Filter */}
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedType}
+                onValueChange={(val) => {
+                  setSelectedType(val);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="bg-slate-50/50 flex-1">
+                  <SelectValue placeholder="All Product Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="simple">Simple Product</SelectItem>
+                  <SelectItem value="variable">Variable Product</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="h-10 px-3 text-xs text-slate-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 shrink-0 gap-1"
+                  title="Clear all filters"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Clear</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mobile/Tablet Filter Modal */}
+      <FilterModal
+        open={filterModalOpen}
+        onOpenChange={setFilterModalOpen}
+        title="Filter Products"
+        activeCount={activeFilterCount}
+        onClear={handleClearFilters}
+      >
+        <div className="space-y-3.5">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Search Query</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by name or SKU..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Category</label>
+            <Select
+              value={selectedCategory}
+              onValueChange={(val) => {
+                setSelectedCategory(val);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categoriesList.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Stock Status</label>
+            <Select
+              value={selectedStock}
+              onValueChange={(val) => {
+                setSelectedStock(val);
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Stock Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stock Status</SelectItem>
+                <SelectItem value="instock">In Stock</SelectItem>
+                <SelectItem value="lowstock">Low Stock</SelectItem>
+                <SelectItem value="outofstock">Out of Stock</SelectItem>
+                <SelectItem value="onbackorder">On Backorder</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1.5">Product Type</label>
             <Select
               value={selectedType}
               onValueChange={(val) => {
@@ -254,7 +461,7 @@ export function ProductsListPage() {
                 setCurrentPage(1);
               }}
             >
-              <SelectTrigger className="bg-slate-50/50">
+              <SelectTrigger>
                 <SelectValue placeholder="All Product Types" />
               </SelectTrigger>
               <SelectContent>
@@ -264,8 +471,8 @@ export function ProductsListPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </FilterModal>
 
       {/* Product Table */}
       <Card>
@@ -281,26 +488,20 @@ export function ProductsListPage() {
               />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16">Image</TableHead>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Categories</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-12 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile & Tablet Card View (< lg) */}
+              <div className="lg:hidden p-3 sm:p-4 space-y-3 bg-slate-50/40">
                 {paginatedProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    {/* Thumbnail */}
-                    <TableCell>
-                      <div className="h-11 w-11 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+                  <div
+                    key={product.id}
+                    className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-white shadow-sm hover:border-slate-300 transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Thumbnail */}
+                      <div
+                        onClick={() => navigate(`/products/${product.id}`)}
+                        className="h-16 w-16 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0 cursor-pointer"
+                      >
                         {product.images[0] ? (
                           <img
                             src={product.images[0].src}
@@ -309,116 +510,252 @@ export function ProductsListPage() {
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center text-slate-400">
-                            <Package className="h-5 w-5" />
+                            <Package className="h-6 w-6" />
                           </div>
                         )}
                       </div>
-                    </TableCell>
 
-                    {/* Name */}
-                    <TableCell>
-                      <button
-                        onClick={() => navigate(`/products/${product.id}`)}
-                        className="text-left font-medium text-slate-900 hover:text-red-600 transition-colors line-clamp-1"
-                      >
-                        {product.name}
-                      </button>
-                      <span className="text-[11px] text-slate-400 block mt-0.5">
-                        Slug: {product.slug}
-                      </span>
-                    </TableCell>
-
-                    {/* SKU */}
-                    <TableCell className="font-mono text-xs text-slate-600">
-                      {product.sku}
-                    </TableCell>
-
-                    {/* Type */}
-                    <TableCell>
-                      {product.type === 'variable' ? (
-                        <Badge variant="purple" className="text-[10px]">
-                          Variable
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Simple
-                        </Badge>
-                      )}
-                    </TableCell>
-
-                    {/* Stock */}
-                    <TableCell>{getStockBadge(product)}</TableCell>
-
-                    {/* Price */}
-                    <TableCell>
-                      <div className="font-semibold text-slate-900">
-                        {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
-                        {formatMoney(product.price)}
-                      </div>
-                      {isOnSale(product) && (
-                        <div className="text-[11px] text-slate-400 line-through">
-                          {formatMoney(product.regularPrice)}
-                        </div>
-                      )}
-                    </TableCell>
-
-                    {/* Categories */}
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {product.categories.slice(0, 2).map((cat) => (
-                          <span
-                            key={cat}
-                            className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]"
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                    </TableCell>
-
-                    {/* Status */}
-                    <TableCell>
-                      <ProductStatusBadge status={product.status} />
-                    </TableCell>
-
-                    {/* Actions Menu */}
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4 text-slate-500" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <button
                             onClick={() => navigate(`/products/${product.id}`)}
-                            className="gap-2"
+                            className="text-left font-semibold text-sm text-slate-900 hover:text-red-600 line-clamp-2 leading-snug"
                           >
-                            <Eye className="h-4 w-4 text-slate-500" />
-                            <span>View Details</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => navigate(`/products/${product.id}/edit`)}
-                            className="gap-2"
-                          >
-                            <Edit className="h-4 w-4 text-slate-500" />
-                            <span>Edit Product</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setProductToDelete(product)}
-                            className="gap-2 text-red-600 focus:text-red-700 focus:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span>Delete</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
+                            {product.name}
+                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 -mr-1">
+                                <MoreVertical className="h-4 w-4 text-slate-500" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => navigate(`/products/${product.id}`)}
+                                className="gap-2"
+                              >
+                                <Eye className="h-4 w-4 text-slate-500" />
+                                <span>View Details</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => navigate(`/products/${product.id}/edit`)}
+                                className="gap-2"
+                              >
+                                <Edit className="h-4 w-4 text-slate-500" />
+                                <span>Edit Product</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setProductToDelete(product)}
+                                className="gap-2 text-red-600 focus:text-red-700 focus:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          {product.sku && (
+                            <span className="font-mono text-[11px] text-slate-500">
+                              {product.sku}
+                            </span>
+                          )}
+                          {product.sku && <span className="text-slate-300">•</span>}
+                          {product.type === 'variable' ? (
+                            <Badge variant="purple" className="text-[10px] py-0 px-1.5 h-4">
+                              Variable
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                              Simple
+                            </Badge>
+                          )}
+                          <ProductStatusBadge status={product.status} />
+                        </div>
+
+                        {product.categories.length > 0 && (
+                          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                            {product.categories.slice(0, 2).map((cat) => (
+                              <span
+                                key={cat}
+                                className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                            {product.categories.length > 2 && (
+                              <span className="text-[10px] text-slate-400">
+                                +{product.categories.length - 2} more
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold text-slate-900">
+                              {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
+                              {formatMoney(product.price)}
+                            </span>
+                            {isOnSale(product) && (
+                              <span className="text-xs text-slate-400 line-through">
+                                {formatMoney(product.regularPrice)}
+                              </span>
+                            )}
+                          </div>
+                          <div>{getStockBadge(product)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop Table View (lg and above) */}
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Image</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Stock</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Categories</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-12 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedProducts.map((product) => (
+                      <TableRow key={product.id}>
+                        {/* Thumbnail */}
+                        <TableCell>
+                          <div className="h-11 w-11 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+                            {product.images[0] ? (
+                              <img
+                                src={product.images[0].src}
+                                alt={product.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-slate-400">
+                                <Package className="h-5 w-5" />
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Name */}
+                        <TableCell>
+                          <button
+                            onClick={() => navigate(`/products/${product.id}`)}
+                            className="text-left font-medium text-slate-900 hover:text-red-600 transition-colors line-clamp-1"
+                          >
+                            {product.name}
+                          </button>
+                          <span className="text-[11px] text-slate-400 block mt-0.5">
+                            Slug: {product.slug}
+                          </span>
+                        </TableCell>
+
+                        {/* SKU */}
+                        <TableCell className="font-mono text-xs text-slate-600">
+                          {product.sku}
+                        </TableCell>
+
+                        {/* Type */}
+                        <TableCell>
+                          {product.type === 'variable' ? (
+                            <Badge variant="purple" className="text-[10px]">
+                              Variable
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Simple
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        {/* Stock */}
+                        <TableCell>{getStockBadge(product)}</TableCell>
+
+                        {/* Price */}
+                        <TableCell>
+                          <div className="font-semibold text-slate-900">
+                            {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
+                            {formatMoney(product.price)}
+                          </div>
+                          {isOnSale(product) && (
+                            <div className="text-[11px] text-slate-400 line-through">
+                              {formatMoney(product.regularPrice)}
+                            </div>
+                          )}
+                        </TableCell>
+
+                        {/* Categories */}
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {product.categories.slice(0, 2).map((cat) => (
+                              <span
+                                key={cat}
+                                className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]"
+                              >
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell>
+                          <ProductStatusBadge status={product.status} />
+                        </TableCell>
+
+                        {/* Actions Menu */}
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4 text-slate-500" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => navigate(`/products/${product.id}`)}
+                                className="gap-2"
+                              >
+                                <Eye className="h-4 w-4 text-slate-500" />
+                                <span>View Details</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => navigate(`/products/${product.id}/edit`)}
+                                className="gap-2"
+                              >
+                                <Edit className="h-4 w-4 text-slate-500" />
+                                <span>Edit Product</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setProductToDelete(product)}
+                                className="gap-2 text-red-600 focus:text-red-700 focus:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span>Delete</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
 
           {/* Pagination */}

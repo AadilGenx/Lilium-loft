@@ -9,6 +9,7 @@ import {
   Check,
   IndianRupee,
   Package,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ export function ShippingPage() {
   const [editingMethod, setEditingMethod] = useState<ShippingMethod | null>(null);
   const [saving, setSaving] = useState(false);
   const [methodToDelete, setMethodToDelete] = useState<ShippingMethod | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
 
   // Form state
   const [methodType, setMethodType] = useState<string>('flat_rate');
@@ -72,6 +74,7 @@ export function ShippingPage() {
     setEditingMethod(null);
     setMethodType('flat_rate');
     setMethodTitle('');
+    setTitleError(null);
     setMethodCost(0);
     setTaxStatus(undefined);
     setMethodModalOpen(true);
@@ -81,6 +84,7 @@ export function ShippingPage() {
     setEditingMethod(m);
     setMethodType(m.type);
     setMethodTitle(m.title);
+    setTitleError(null);
     setMethodCost(m.cost ?? 0);
     setTaxStatus(m.taxStatus);
     setMethodModalOpen(true);
@@ -89,9 +93,11 @@ export function ShippingPage() {
   const handleSaveMethod = async () => {
     if (!currentZone) return;
     if (!methodTitle.trim()) {
+      setTitleError('Method title is required');
       toast.error('Title is required.');
       return;
     }
+    setTitleError(null);
 
     setSaving(true);
     try {
@@ -192,20 +198,25 @@ export function ShippingPage() {
                   <button
                     key={zone.id}
                     onClick={() => setSelectedZoneId(zone.id)}
-                    className={`w-full text-left p-3 rounded-lg text-xs transition-colors flex items-center justify-between ${
+                    className={`w-full text-left p-3 rounded-lg text-xs transition-colors flex items-center justify-between gap-3 ${
                       isSelected
                         ? 'bg-red-50 text-red-700 font-semibold border border-red-200'
-                        : 'hover:bg-slate-50 text-slate-700'
+                        : 'hover:bg-slate-50 text-slate-700 border border-transparent'
                     }`}
                   >
-                    <div>
-                      <div className="text-sm font-semibold">{zone.name}</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {zone.regions.join(', ')}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold truncate">{zone.name}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 break-words">
+                        {zone.regions.length > 0
+                          ? zone.regions.join(', ')
+                          : 'Locations not covered by your other zones'}
                       </div>
                     </div>
-                    <Badge variant={isSelected ? 'default' : 'outline'} className="text-[10px]">
-                      {zone.methods.length} methods
+                    <Badge
+                      variant={isSelected ? 'default' : 'outline'}
+                      className="text-[10px] shrink-0 whitespace-nowrap ml-2"
+                    >
+                      {zone.methods.length} {zone.methods.length === 1 ? 'method' : 'methods'}
                     </Badge>
                   </button>
                 );
@@ -247,12 +258,12 @@ export function ShippingPage() {
                       key={method.id}
                       className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="h-10 w-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
                           <Truck className="h-5 w-5" />
                         </div>
-                        <div>
-                          <div className="font-semibold text-slate-800 text-sm">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-semibold text-slate-800 text-sm truncate">
                             {method.title}
                           </div>
                           <div className="text-xs text-slate-400 mt-0.5">
@@ -350,9 +361,19 @@ export function ShippingPage() {
               </label>
               <Input
                 value={methodTitle}
-                onChange={(e) => setMethodTitle(e.target.value)}
+                onChange={(e) => {
+                  setMethodTitle(e.target.value);
+                  if (titleError && e.target.value.trim()) setTitleError(null);
+                }}
                 placeholder="e.g. Standard Ground Shipping"
+                className={titleError ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {titleError && (
+                <p className="text-[11px] text-red-600 flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  {titleError}
+                </p>
+              )}
             </div>
 
             {methodType === 'flat_rate' && (

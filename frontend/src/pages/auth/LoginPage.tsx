@@ -17,20 +17,30 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   // Return to page user originally tried to access, or dashboard
   const from = (location.state as any)?.from?.pathname || '/';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      setErrorMessage('Please enter both email and password.');
+    const errors: { email?: string; password?: string } = {};
+    if (!email.trim()) {
+      errors.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (!password) {
+      errors.password = 'Password is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
+    setFieldErrors({});
     setLoading(true);
-    setErrorMessage(null);
 
     try {
       const success = await login(email.trim(), password);
@@ -38,10 +48,13 @@ export function LoginPage() {
         toast.success('Welcome back! Signed in successfully.');
         navigate(from, { replace: true });
       } else {
-        setErrorMessage(useBackendSyncStore.getState().errorMessage || 'Invalid email or password. Please verify your credentials.');
+        const errorMsg =
+          useBackendSyncStore.getState().errorMessage ||
+          'Invalid email or password. Please verify your credentials.';
+        toast.error(errorMsg);
       }
     } catch (err: any) {
-      setErrorMessage(getErrorMessage(err, 'Could not sign in. Please try again.'));
+      toast.error(getErrorMessage(err, 'Could not sign in. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -78,49 +91,59 @@ export function LoginPage() {
 
             <div className="h-px bg-slate-100 w-full" />
 
-            <form onSubmit={handleLogin} className="space-y-3.5">
-              {/* Error Alert */}
-              {errorMessage && (
-                <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2 text-xs text-red-700 animate-in fade-in duration-200">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
-                  <div className="leading-tight">{errorMessage}</div>
-                </div>
-              )}
-
+            <form onSubmit={handleLogin} noValidate className="space-y-3.5">
               {/* Email Field */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700 block">
-                  Email Address
+                  Email Address <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                    }}
                     placeholder="you@example.com"
-                    required
                     disabled={loading}
-                    className="pl-9 h-9.5 text-sm border-slate-200 focus:border-red-600 focus:ring-red-600/20"
+                    className={`pl-9 h-9.5 text-sm ${
+                      fieldErrors.email
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                        : 'border-slate-200 focus:border-red-600 focus:ring-red-600/20'
+                    }`}
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{fieldErrors.email}</span>
+                  </p>
+                )}
               </div>
 
               {/* Password Field */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700 block">
-                  Password
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
                     placeholder="••••••••"
-                    required
                     disabled={loading}
-                    className="pl-9 pr-10 h-9.5 text-sm border-slate-200 focus:border-red-600 focus:ring-red-600/20"
+                    className={`pl-9 pr-10 h-9.5 text-sm ${
+                      fieldErrors.password
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                        : 'border-slate-200 focus:border-red-600 focus:ring-red-600/20'
+                    }`}
                   />
                   <button
                     type="button"
@@ -135,6 +158,12 @@ export function LoginPage() {
                     )}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{fieldErrors.password}</span>
+                  </p>
+                )}
               </div>
 
               {/* Submit Button */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Save, ImagePlus, Trash2, Check } from 'lucide-react';
+import { ArrowLeft, Save, ImagePlus, Trash2, Check, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,7 @@ export function ProductFormPage() {
   // Only the images the product really has; nothing is pre-filled.
   const [images, setImages] = useState<ProductImage[]>(existingProduct?.images ?? []);
   const [newImageUrl, setNewImageUrl] = useState('');
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -108,16 +109,57 @@ export function ProductFormPage() {
   };
 
   const handleAddImage = () => {
-    if (!newImageUrl.trim()) return;
+    const trimmed = newImageUrl.trim();
+    if (!trimmed) {
+      toast.error('Please enter an image URL to add to gallery');
+      imageInputRef.current?.focus();
+      return;
+    }
+
+    let url = trimmed;
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+
+    try {
+      new URL(url);
+    } catch {
+      toast.error('Please enter a valid image URL (e.g. https://example.com/image.jpg)');
+      return;
+    }
+
+    if (images.some((img) => img.src === url)) {
+      toast.warning('This image is already in the gallery');
+      return;
+    }
+
     setImages((prev) => [
       ...prev,
-      { id: `new-${Date.now()}`, src: newImageUrl.trim(), alt: '' },
+      { id: `new-${Date.now()}`, src: url, alt: '' },
     ]);
     setNewImageUrl('');
+    toast.success('Image added to gallery');
+    imageInputRef.current?.focus();
+  };
+
+  const handlePasteClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text?.trim()) {
+        setNewImageUrl(text.trim());
+        toast.info('Pasted URL from clipboard');
+        imageInputRef.current?.focus();
+      } else {
+        toast.error('Clipboard is empty');
+      }
+    } catch {
+      toast.error('Unable to access clipboard. Please paste manually into the input.');
+    }
   };
 
   const handleRemoveImage = (imgId: string) => {
     setImages((prev) => prev.filter((i) => i.id !== imgId));
+    toast.info('Image removed from gallery');
   };
 
   const toggleCategory = (catName: string) => {
@@ -231,9 +273,13 @@ export function ProductFormPage() {
                     placeholder="e.g. Minimalist Chronograph Watch"
                     {...register('name')}
                     onChange={handleNameChange}
+                    className={errors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}
                   />
                   {errors.name && (
-                    <p className="text-xs text-red-600">{errors.name.message}</p>
+                    <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{errors.name.message}</span>
+                    </p>
                   )}
                 </div>
 
@@ -242,7 +288,7 @@ export function ProductFormPage() {
                   <label className="text-xs font-semibold text-slate-700">
                     URL Slug <span className="text-red-500">*</span>
                   </label>
-                  <div className="flex items-center rounded-md border border-slate-300 bg-slate-50 px-3 text-xs text-slate-500 overflow-x-auto">
+                  <div className={`flex items-center rounded-md border ${errors.slug ? 'border-red-500' : 'border-slate-300'} bg-slate-50 px-3 text-xs text-slate-500 overflow-x-auto`}>
                     <span className="shrink-0">store.com/product/</span>
                     <input
                       {...register('slug')}
@@ -250,7 +296,10 @@ export function ProductFormPage() {
                     />
                   </div>
                   {errors.slug && (
-                    <p className="text-xs text-red-600">{errors.slug.message}</p>
+                    <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 shrink-0" />
+                      <span>{errors.slug.message}</span>
+                    </p>
                   )}
                 </div>
 
@@ -295,9 +344,16 @@ export function ProductFormPage() {
                     <label className="text-xs font-semibold text-slate-700">
                       SKU Code
                     </label>
-                    <Input placeholder="e.g. SKU-001" {...register('sku')} />
+                    <Input
+                      placeholder="e.g. SKU-001"
+                      {...register('sku')}
+                      className={errors.sku ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                    />
                     {errors.sku && (
-                      <p className="text-xs text-red-600">{errors.sku.message}</p>
+                      <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{errors.sku.message}</span>
+                      </p>
                     )}
                   </div>
 
@@ -312,9 +368,13 @@ export function ProductFormPage() {
                       placeholder="0.00"
                       {...register('regularPrice')}
                       disabled={!pricesEditable}
+                      className={errors.regularPrice ? 'border-red-500 focus-visible:ring-red-500' : ''}
                     />
                     {errors.regularPrice && (
-                      <p className="text-xs text-red-600">{errors.regularPrice.message}</p>
+                      <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 shrink-0" />
+                        <span>{errors.regularPrice.message}</span>
+                      </p>
                     )}
                   </div>
 
@@ -366,10 +426,12 @@ export function ProductFormPage() {
                           type="number"
                           min="0"
                           {...register('stockQuantity')}
+                          className={errors.stockQuantity ? 'border-red-500 focus-visible:ring-red-500' : ''}
                         />
                         {errors.stockQuantity && (
-                          <p className="text-xs text-red-600">
-                            {errors.stockQuantity.message}
+                          <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 shrink-0" />
+                            <span>{errors.stockQuantity.message}</span>
                           </p>
                         )}
                       </div>
@@ -403,56 +465,95 @@ export function ProductFormPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold">Product Images & Gallery</CardTitle>
                 <CardDescription className="text-xs">
-                  Upload or link high resolution images for catalog display
+                  Link public high-resolution images for catalog and store display
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Input
-                    placeholder="Paste a public image URL..."
-                    value={newImageUrl}
-                    onChange={(e) => setNewImageUrl(e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleAddImage}
-                    className="gap-1.5 shrink-0 bg-white"
-                  >
-                    <ImagePlus className="h-4 w-4" />
-                    <span>Add to Gallery</span>
-                  </Button>
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        ref={imageInputRef}
+                        placeholder="Paste image URL (e.g. https://example.com/photo.jpg)..."
+                        value={newImageUrl}
+                        onChange={(e) => setNewImageUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddImage();
+                          }
+                        }}
+                        className="bg-white pr-20"
+                      />
+                      {typeof navigator !== 'undefined' && 'clipboard' in navigator && (
+                        <button
+                          type="button"
+                          onClick={handlePasteClipboard}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded transition-colors"
+                        >
+                          Paste
+                        </button>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAddImage}
+                      className="gap-1.5 shrink-0 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                    >
+                      <ImagePlus className="h-4 w-4 text-red-600" />
+                      <span>Add to Gallery</span>
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Paste a direct image URL from your WordPress Media Library, website, or CDN, then click <strong>Add to Gallery</strong> (or press Enter).
+                  </p>
                 </div>
 
-                {images.length === 0 && (
-                  <p className="text-xs text-slate-400">No images yet.</p>
-                )}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  {images.map((img, idx) => (
-                    <div
-                      key={img.id}
-                      className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100"
-                    >
-                      <img
-                        src={img.src}
-                        alt={img.alt}
-                        className="h-full w-full object-cover"
-                      />
-                      {idx === 0 && (
-                        <span className="absolute top-1.5 left-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-semibold shadow">
-                          Main
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(img.id)}
-                        className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                {images.length === 0 ? (
+                  <div
+                    onClick={() => imageInputRef.current?.focus()}
+                    className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center cursor-pointer hover:border-slate-300 transition-colors bg-slate-50/50"
+                  >
+                    <ImagePlus className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-slate-600">No images added yet</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Paste a public image URL in the field above and click "Add to Gallery"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                    {images.map((img, idx) => (
+                      <div
+                        key={img.id}
+                        className="group relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-xs"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <img
+                          src={img.src}
+                          alt={img.alt || `Product image ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://placehold.co/400x400/f1f5f9/94a3b8?text=Image+Failed';
+                          }}
+                        />
+                        {idx === 0 && (
+                          <span className="absolute top-1.5 left-1.5 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-semibold shadow">
+                            Main Image
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(img.id)}
+                          className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          title="Remove image"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

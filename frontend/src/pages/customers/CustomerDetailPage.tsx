@@ -11,6 +11,7 @@ import {
   MapPin,
   Edit,
   ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,7 @@ export function CustomerDetailPage() {
 
   // Address edit modal state
   const [editAddressOpen, setEditAddressOpen] = useState(false);
+  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
   const [billingAddress, setBillingAddress] = useState(
     customer?.billing || {
       firstName: '',
@@ -84,9 +86,24 @@ export function CustomerDetailPage() {
   const computedOrdersCount = customer.totalOrders;
 
   const handleSaveAddress = async () => {
+    const errs: Record<string, string> = {};
+    if (!billingAddress.firstName?.trim()) {
+      errs.firstName = 'First name is required';
+    }
+    if (!billingAddress.lastName?.trim()) {
+      errs.lastName = 'Last name is required';
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setAddressErrors(errs);
+      return;
+    }
+    setAddressErrors({});
+
     try {
       await updateCustomerAddress(customer.id, billingAddress);
       toast.success('Customer address updated.');
+      setAddressErrors({});
       setEditAddressOpen(false);
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -216,46 +233,83 @@ export function CustomerDetailPage() {
                   No orders placed by this customer yet.
                 </div>
               ) : (
-                <div className="overflow-x-auto w-full">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="w-12 text-right"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {customerOrders.map((ord) => (
-                        <TableRow
-                          key={ord.id}
-                          onClick={() => navigate(`/orders/${ord.id}`)}
-                          className="cursor-pointer hover:bg-slate-50 transition-colors"
-                        >
-                          <TableCell className="font-bold font-mono text-slate-900 text-xs">
-                            {ord.orderNumber}
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                <>
+                  {/* Mobile & Tablet Card View (< lg) */}
+                  <div className="lg:hidden p-3 sm:p-4 space-y-3 bg-slate-50/40">
+                    {customerOrders.map((ord) => (
+                      <div
+                        key={ord.id}
+                        onClick={() => navigate(`/orders/${ord.id}`)}
+                        className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-white shadow-sm hover:border-slate-300 hover:shadow cursor-pointer transition-all space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold font-mono text-slate-900 text-xs">
+                            #{ord.orderNumber}
+                          </span>
+                          {getOrderStatusBadge(ord.status)}
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">
                             {formatDate(ord.dateCreated)}
-                          </TableCell>
-                          <TableCell>{getOrderStatusBadge(ord.status)}</TableCell>
-                          <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                            {ord.items.length} {ord.items.length === 1 ? 'item' : 'items'}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-slate-900 text-xs">
+                          </span>
+                          <span className="font-bold text-slate-900">
                             {formatCurrency(ord.total, ord.currency)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <ExternalLink className="h-3.5 w-3.5 text-slate-400 inline" />
-                          </TableCell>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100 text-slate-400">
+                          <span>{ord.items.length} {ord.items.length === 1 ? 'item' : 'items'}</span>
+                          <span className="flex items-center gap-1 text-red-600 font-medium">
+                            View Order <ExternalLink className="h-3 w-3" />
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View (lg and above) */}
+                  <div className="hidden lg:block overflow-x-auto w-full">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Order</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Items</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="w-12 text-right"></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {customerOrders.map((ord) => (
+                          <TableRow
+                            key={ord.id}
+                            onClick={() => navigate(`/orders/${ord.id}`)}
+                            className="cursor-pointer hover:bg-slate-50 transition-colors"
+                          >
+                            <TableCell className="font-bold font-mono text-slate-900 text-xs">
+                              {ord.orderNumber}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                              {formatDate(ord.dateCreated)}
+                            </TableCell>
+                            <TableCell>{getOrderStatusBadge(ord.status)}</TableCell>
+                            <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                              {ord.items.length} {ord.items.length === 1 ? 'item' : 'items'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-slate-900 text-xs">
+                              {formatCurrency(ord.total, ord.currency)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <ExternalLink className="h-3.5 w-3.5 text-slate-400 inline" />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -357,22 +411,38 @@ export function CustomerDetailPage() {
           <div className="space-y-3 py-2 text-xs">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">First Name</label>
+                <label className="font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
                 <Input
                   value={billingAddress.firstName}
-                  onChange={(e) =>
-                    setBillingAddress({ ...billingAddress, firstName: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setBillingAddress({ ...billingAddress, firstName: e.target.value });
+                    if (addressErrors.firstName) setAddressErrors((prev) => ({ ...prev, firstName: undefined! }));
+                  }}
+                  className={addressErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
+                {addressErrors.firstName && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{addressErrors.firstName}</span>
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Last Name</label>
+                <label className="font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
                 <Input
                   value={billingAddress.lastName}
-                  onChange={(e) =>
-                    setBillingAddress({ ...billingAddress, lastName: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setBillingAddress({ ...billingAddress, lastName: e.target.value });
+                    if (addressErrors.lastName) setAddressErrors((prev) => ({ ...prev, lastName: undefined! }));
+                  }}
+                  className={addressErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
+                {addressErrors.lastName && (
+                  <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    <span>{addressErrors.lastName}</span>
+                  </p>
+                )}
               </div>
             </div>
 

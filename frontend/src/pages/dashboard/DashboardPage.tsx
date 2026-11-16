@@ -61,6 +61,8 @@ export function DashboardPage() {
 
   // Everything here comes from the backend dashboard endpoints; with no data it simply shows zeros / empty states.
   const totalRevenue = summary?.revenue ?? 0;
+  const onlineSales = summary?.paid_revenue ?? 0;
+  const cashSales = summary?.unpaid_revenue ?? 0;
   const ordersInPeriod = summary?.orders ?? 0;
   const processingOrders = summary?.awaiting_fulfilment ?? 0;
 
@@ -183,67 +185,76 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Total Revenue */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <Card className="hover:border-slate-300/80 transition-colors">
+          <CardContent
+            className="p-3 sm:p-4"
+            title={
+              summary
+                ? `Total: ${formatCurrency(totalRevenue)} (Online: ${formatCurrency(onlineSales)}, Cash: ${formatCurrency(cashSales)})${
+                    summary.refunded > 0 ? ` · Refunded: ${formatCurrency(summary.refunded)}` : ''
+                  }`
+                : undefined
+            }
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-slate-500 truncate">
                 Total Sales
               </span>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
-                <IndianRupee className="h-5 w-5" />
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                <IndianRupee className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-slate-900">
-                {summary ? formatCurrency(totalRevenue) : '—'}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1 text-xs">
+            <div className="mt-1.5 sm:mt-2">
+              <div className="flex items-baseline justify-between gap-1">
+                <div className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 truncate">
+                  {summary ? formatCurrency(totalRevenue) : '—'}
+                </div>
                 <Change value={revenueChange} />
-                <span className="text-slate-400">
-                  {summary ? (revenueChange === null ? `last ${summary.days} days` : 'vs previous period') : ''}
+              </div>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-2 gap-y-0.5 mt-1 sm:mt-1.5 text-[10px] sm:text-[11px]">
+                <span className="inline-flex items-center gap-1 text-slate-600 truncate max-w-full">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="text-slate-400">Online:</span>
+                  <span className="font-semibold text-slate-700 truncate">
+                    {summary ? formatCurrency(onlineSales) : '—'}
+                  </span>
+                </span>
+                <span className="hidden sm:inline text-slate-300">•</span>
+                <span className="inline-flex items-center gap-1 text-slate-600 truncate max-w-full">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                  <span className="text-slate-400">Cash:</span>
+                  <span className="font-semibold text-slate-700 truncate">
+                    {summary ? formatCurrency(cashSales) : '—'}
+                  </span>
                 </span>
               </div>
-              {summary && (
-                <div className="mt-1.5 text-[11px] leading-snug text-slate-400">
-                  <div>
-                    Paid {formatCurrency(summary.paid_revenue)}
-                    {summary.unpaid_revenue > 0 && (
-                      <span className="text-amber-600">
-                        {' '}· Awaiting payment {formatCurrency(summary.unpaid_revenue)}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    Processing + completed orders
-                    {summary.refunded > 0 ? `, after ${formatCurrency(summary.refunded)} refunded` : ''}
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
 
         {/* Total Orders */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <Card className="hover:border-slate-300/80 transition-colors">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-slate-500 truncate">
                 Orders
               </span>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                <ShoppingCart className="h-5 w-5" />
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-slate-900">
-                {summary ? formatNumber(ordersInPeriod) : '—'}
-              </div>
-              <div className="flex items-center gap-1.5 mt-1 text-xs">
+            <div className="mt-1.5 sm:mt-2">
+              <div className="flex items-baseline justify-between gap-1">
+                <div className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 truncate">
+                  {summary ? formatNumber(ordersInPeriod) : '—'}
+                </div>
                 <Change value={ordersChange} />
-                <span className="text-slate-400">
-                  {summary ? `${processingOrders} processing` : ''}
+              </div>
+              <div className="flex items-center gap-1.5 mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] text-slate-500 truncate">
+                <span className="text-slate-400 truncate">
+                  {summary ? `${processingOrders} processing` : 'in selected period'}
                 </span>
               </div>
             </div>
@@ -251,28 +262,30 @@ export function DashboardPage() {
         </Card>
 
         {/* Active Products */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <Card className="hover:border-slate-300/80 transition-colors">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-slate-500 truncate">
                 Catalog Items
               </span>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                <Package className="h-5 w-5" />
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-slate-900">
-                {summary ? formatNumber(summary.published_products) : '—'}
+            <div className="mt-1.5 sm:mt-2">
+              <div className="flex items-baseline justify-between gap-1">
+                <div className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 truncate">
+                  {summary ? formatNumber(summary.published_products) : '—'}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-1 text-xs">
+              <div className="flex items-center gap-1.5 mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] text-slate-500 truncate">
                 {(summary?.out_of_stock_products ?? 0) > 0 ? (
-                  <span className="flex items-center text-amber-600 font-medium">
-                    <AlertTriangle className="h-3.5 w-3.5 mr-0.5" />
+                  <span className="flex items-center text-amber-600 font-medium truncate">
+                    <AlertTriangle className="h-3 w-3 mr-0.5 shrink-0" />
                     {summary?.out_of_stock_products} out of stock
                   </span>
                 ) : (
-                  <span className="text-slate-400">published products</span>
+                  <span className="text-slate-400 truncate">published products</span>
                 )}
               </div>
             </div>
@@ -280,22 +293,24 @@ export function DashboardPage() {
         </Card>
 
         {/* Customers */}
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <Card className="hover:border-slate-300/80 transition-colors">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-slate-500 truncate">
                 Customers
               </span>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
-                <Users className="h-5 w-5" />
+              <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </div>
-            <div className="mt-3">
-              <div className="text-2xl font-bold text-slate-900">
-                {summary ? formatNumber(summary.customers) : '—'}
+            <div className="mt-1.5 sm:mt-2">
+              <div className="flex items-baseline justify-between gap-1">
+                <div className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 truncate">
+                  {summary ? formatNumber(summary.customers) : '—'}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-1 text-xs">
-                <span className="text-slate-400">registered customers</span>
+              <div className="flex items-center gap-1.5 mt-1 sm:mt-1.5 text-[10px] sm:text-[11px] text-slate-500 truncate">
+                <span className="text-slate-400 truncate">registered customers</span>
               </div>
             </div>
           </CardContent>

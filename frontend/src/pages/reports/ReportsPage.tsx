@@ -202,40 +202,40 @@ export function ReportsPage() {
 
         {/* Sales Performance Tab */}
         <TabsContent value="sales" className="space-y-6 mt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             <Card>
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <CardContent className="p-3 sm:p-4 md:p-5">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate block">
                   Gross Sales
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
                   {totals ? formatCurrency(totals.gross_sales) : '—'}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">
+                <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">
                   {totals ? `${totals.items_sold} items sold` : ''}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <CardContent className="p-3 sm:p-4 md:p-5">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate block">
                   Net Sales
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
                   {totals ? formatCurrency(totals.net_sales) : '—'}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">After refunds, shipping & tax</div>
+                <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">After refunds, shipping & tax</div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <CardContent className="p-3 sm:p-4 md:p-5">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate block">
                   Orders Placed
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">{totals ? totals.orders : '—'}</div>
-                <div className="text-xs text-slate-400 mt-1">
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">{totals ? totals.orders : '—'}</div>
+                <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">
                   {totals
                     ? `${formatCurrency(totals.discounts)} in discounts${
                         totals.refunds > 0 ? ` · ${formatCurrency(totals.refunds)} refunded` : ''
@@ -246,14 +246,14 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardContent className="p-5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <CardContent className="p-3 sm:p-4 md:p-5">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-500 truncate block">
                   Avg. Order Value (AOV)
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
+                <div className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
                   {totals ? formatCurrency(totals.average_order_value) : '—'}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">Per order</div>
+                <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">Per order</div>
               </CardContent>
             </Card>
           </div>
@@ -333,26 +333,44 @@ export function ReportsPage() {
                 {categories.length === 0 ? (
                   noData('No category sales in this period')
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-center">Units Sold</TableHead>
-                        <TableHead className="text-right">Revenue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    {/* Mobile & Tablet Card View (< lg) */}
+                    <div className="lg:hidden p-3 sm:p-4 space-y-2.5 bg-slate-50/40">
                       {categories.map((c) => (
-                        <TableRow key={c.category_woo_id}>
-                          <TableCell className="font-semibold text-slate-800">{c.name}</TableCell>
-                          <TableCell className="text-center text-xs">{c.units} units</TableCell>
-                          <TableCell className="text-right font-bold text-slate-900">
-                            {formatCurrency(c.revenue)}
-                          </TableCell>
-                        </TableRow>
+                        <div key={c.category_woo_id} className="p-3 sm:p-3.5 rounded-lg border border-slate-200/80 bg-white shadow-sm flex items-center justify-between">
+                          <div>
+                            <span className="font-semibold text-xs text-slate-800 block">{c.name}</span>
+                            <span className="text-[11px] text-slate-400">{c.units} units sold</span>
+                          </div>
+                          <span className="font-bold text-xs text-slate-900">{formatCurrency(c.revenue)}</span>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+
+                    {/* Desktop Table View (lg and above) */}
+                    <div className="hidden lg:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Category</TableHead>
+                            <TableHead className="text-center">Units Sold</TableHead>
+                            <TableHead className="text-right">Revenue</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {categories.map((c) => (
+                            <TableRow key={c.category_woo_id}>
+                              <TableCell className="font-semibold text-slate-800">{c.name}</TableCell>
+                              <TableCell className="text-center text-xs">{c.units} units</TableCell>
+                              <TableCell className="text-right font-bold text-slate-900">
+                                {formatCurrency(c.revenue)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -367,28 +385,46 @@ export function ReportsPage() {
               {products.length === 0 ? (
                 noData('No product sales in this period')
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-center">Orders</TableHead>
-                      <TableHead className="text-center">Units Sold</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Mobile & Tablet Card View (< lg) */}
+                  <div className="lg:hidden p-3 sm:p-4 space-y-2.5 bg-slate-50/40">
                     {products.map((p) => (
-                      <TableRow key={p.product_woo_id}>
-                        <TableCell className="font-semibold text-slate-800">{p.name}</TableCell>
-                        <TableCell className="text-center text-xs">{p.orders}</TableCell>
-                        <TableCell className="text-center text-xs">{p.units}</TableCell>
-                        <TableCell className="text-right font-bold text-slate-900">
-                          {formatCurrency(p.revenue)}
-                        </TableCell>
-                      </TableRow>
+                      <div key={p.product_woo_id} className="p-3 sm:p-3.5 rounded-lg border border-slate-200/80 bg-white shadow-sm flex items-center justify-between">
+                        <div className="min-w-0 pr-2">
+                          <span className="font-semibold text-xs text-slate-800 block truncate">{p.name}</span>
+                          <span className="text-[11px] text-slate-400">{p.orders} orders • {p.units} units</span>
+                        </div>
+                        <span className="font-bold text-xs text-slate-900 shrink-0">{formatCurrency(p.revenue)}</span>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  {/* Desktop Table View (lg and above) */}
+                  <div className="hidden lg:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-center">Orders</TableHead>
+                          <TableHead className="text-center">Units Sold</TableHead>
+                          <TableHead className="text-right">Revenue</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {products.map((p) => (
+                          <TableRow key={p.product_woo_id}>
+                            <TableCell className="font-semibold text-slate-800">{p.name}</TableCell>
+                            <TableCell className="text-center text-xs">{p.orders}</TableCell>
+                            <TableCell className="text-center text-xs">{p.units}</TableCell>
+                            <TableCell className="text-right font-bold text-slate-900">
+                              {formatCurrency(p.revenue)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -407,30 +443,51 @@ export function ReportsPage() {
               {customers.length === 0 ? (
                 noData('No customer orders in this period')
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead className="text-center">Orders</TableHead>
-                      <TableHead>Last Order</TableHead>
-                      <TableHead className="text-right">Total Spent</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <>
+                  {/* Mobile & Tablet Card View (< lg) */}
+                  <div className="lg:hidden p-3 sm:p-4 space-y-2.5 bg-slate-50/40">
                     {customers.map((c) => (
-                      <TableRow key={c.email}>
-                        <TableCell className="font-semibold text-slate-800">{c.name || '-'}</TableCell>
-                        <TableCell className="text-xs text-slate-600">{c.email}</TableCell>
-                        <TableCell className="text-center text-xs">{c.orders}</TableCell>
-                        <TableCell className="text-xs text-slate-500">{formatDate(c.last_order_at)}</TableCell>
-                        <TableCell className="text-right font-bold text-slate-900">
-                          {formatCurrency(c.total_spent)}
-                        </TableCell>
-                      </TableRow>
+                      <div key={c.email} className="p-3 sm:p-3.5 rounded-lg border border-slate-200/80 bg-white shadow-sm space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-xs text-slate-800">{c.name || 'Anonymous'}</span>
+                          <span className="font-bold text-xs text-slate-900">{formatCurrency(c.total_spent)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span className="truncate max-w-[200px]">{c.email}</span>
+                          <span>{c.orders} {c.orders === 1 ? 'order' : 'orders'}</span>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
+                  </div>
+
+                  {/* Desktop Table View (lg and above) */}
+                  <div className="hidden lg:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead className="text-center">Orders</TableHead>
+                          <TableHead>Last Order</TableHead>
+                          <TableHead className="text-right">Total Spent</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {customers.map((c) => (
+                          <TableRow key={c.email}>
+                            <TableCell className="font-semibold text-slate-800">{c.name || '-'}</TableCell>
+                            <TableCell className="text-xs text-slate-600">{c.email}</TableCell>
+                            <TableCell className="text-center text-xs">{c.orders}</TableCell>
+                            <TableCell className="text-xs text-slate-500">{formatDate(c.last_order_at)}</TableCell>
+                            <TableCell className="text-right font-bold text-slate-900">
+                              {formatCurrency(c.total_spent)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

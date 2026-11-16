@@ -67,6 +67,7 @@ export function OrderDetailPage() {
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number>(0);
   const [refundReason, setRefundReason] = useState('');
+  const [refundErrors, setRefundErrors] = useState<{ amount?: string; reason?: string }>({});
 
   if (!order) {
     return (
@@ -106,18 +107,21 @@ export function OrderDetailPage() {
   };
 
   const handleProcessRefund = async () => {
-    if (refundAmount <= 0) {
-      toast.error('Refund amount must be greater than zero.');
-      return;
-    }
-    if (refundAmount > remainingRefundable) {
-      toast.error(`Maximum refundable amount is ${formatCurrency(remainingRefundable, order.currency)}.`);
-      return;
+    const errs: { amount?: string; reason?: string } = {};
+    if (refundAmount <= 0 || isNaN(refundAmount)) {
+      errs.amount = 'Refund amount must be greater than zero.';
+    } else if (refundAmount > remainingRefundable) {
+      errs.amount = `Maximum refundable amount is ${formatCurrency(remainingRefundable, order.currency)}.`;
     }
     if (!refundReason.trim()) {
-      toast.error('Please specify a reason for this refund.');
+      errs.reason = 'Please specify a reason for this refund.';
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setRefundErrors(errs);
       return;
     }
+    setRefundErrors({});
 
     try {
       await refundOrder(order.id, refundAmount, refundReason.trim());
@@ -570,15 +574,25 @@ export function OrderDetailPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">
-                Refund Amount{currencyLabel}
+                Refund Amount{currencyLabel} <span className="text-red-500">*</span>
               </label>
               <Input
                 type="number"
                 step="0.01"
                 max={remainingRefundable}
                 value={refundAmount}
-                onChange={(e) => setRefundAmount(Number(e.target.value))}
+                onChange={(e) => {
+                  setRefundAmount(Number(e.target.value));
+                  if (refundErrors.amount) setRefundErrors((prev) => ({ ...prev, amount: undefined }));
+                }}
+                className={refundErrors.amount ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {refundErrors.amount && (
+                <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  <span>{refundErrors.amount}</span>
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -589,8 +603,18 @@ export function OrderDetailPage() {
                 placeholder="e.g. Customer returned items, damaged during shipment, cancellation"
                 rows={2}
                 value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
+                onChange={(e) => {
+                  setRefundReason(e.target.value);
+                  if (refundErrors.reason) setRefundErrors((prev) => ({ ...prev, reason: undefined }));
+                }}
+                className={refundErrors.reason ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {refundErrors.reason && (
+                <p className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  <span>{refundErrors.reason}</span>
+                </p>
+              )}
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Search, Plus, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Menu, Search, Plus, RefreshCw } from 'lucide-react';
 import { useUIStore, useBackendSyncStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { NotificationDropdown } from './NotificationDropdown';
@@ -33,41 +33,17 @@ export function TopHeader() {
   };
 
   return (
-    <header className="h-20 shrink-0 bg-white border-b border-slate-200/80 z-20 flex items-center justify-between px-3 sm:px-6 gap-2">
-      {/* Left section: mobile hamburger & store badge */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+    <header className="h-20 shrink-0 bg-white border-b border-slate-200/80 z-20 flex items-center justify-between px-3 sm:px-6 gap-3">
+      {/* Left section: mobile hamburger & search bar moved to left */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 max-w-md min-w-0">
         <button
           onClick={() => setMobileMenuOpen(true)}
-          className="md:hidden p-2 -ml-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          className="md:hidden p-2 -ml-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 shrink-0"
         >
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle Menu</span>
         </button>
 
-        <div className="hidden lg:flex items-center gap-2">
-          {status === 'connected' ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              API Connected (Live)
-            </span>
-          ) : status === 'syncing' ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/60">
-              <RefreshCw className="h-3 w-3 animate-spin text-blue-500" />
-              Syncing API...
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-              API Disconnected
-            </span>
-          )}
-          <span className="text-xs text-slate-300">|</span>
-          <span className="text-xs text-slate-500 font-medium">Lilium & Loft Store</span>
-        </div>
-      </div>
-
-      {/* Middle section: Global Search Trigger */}
-      <div className="flex-1 max-w-lg mx-1 sm:mx-4 min-w-0">
         <button
           onClick={() => setSearchOpen(true)}
           className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/70 text-slate-400 hover:bg-slate-100/70 hover:border-slate-300 transition-all text-sm"
