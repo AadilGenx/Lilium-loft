@@ -40,13 +40,14 @@ import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { getErrorMessage } from '@/utils/errors';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import { STICKY_COLUMN } from '@/utils/sticky';
+import { PageLoading } from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 
 export function OrderDetailPage() {
   const currencyLabel = useCurrencyLabel();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orders, loadOrderDetails, updateOrderStatus, addOrderNote, refundOrder } = useOrderStore();
+  const { orders, loaded: ordersLoaded, loadOrderDetails, updateOrderStatus, addOrderNote, refundOrder } = useOrderStore();
 
   const order = orders.find((o) => o.id === id);
   const customers = useCustomerStore((st) => st.customers);
@@ -67,6 +68,8 @@ export function OrderDetailPage() {
   const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number>(0);
   const [refundReason, setRefundReason] = useState('');
+
+  if (!order && !ordersLoaded) return <PageLoading label="Loading order..." />;
 
   if (!order) {
     return (
@@ -246,9 +249,11 @@ export function OrderDetailPage() {
                         <div className="font-semibold text-slate-800 text-sm">
                           {item.name}
                         </div>
-                        <div className="text-xs text-slate-400 font-mono mt-0.5">
-                          SKU: {item.sku}
-                        </div>
+                        {item.sku && (
+                          <div className="text-xs text-slate-400 font-mono mt-0.5">
+                            SKU: {item.sku}
+                          </div>
+                        )}
                         {item.attributes && (
                           <div className="text-[11px] text-slate-500 mt-0.5">
                             {Object.entries(item.attributes)

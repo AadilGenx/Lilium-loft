@@ -138,7 +138,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'hidden md:flex flex-col bg-white border-r border-slate-200/80 h-full shrink-0 transition-all duration-300 z-30 select-none',
+        'hidden lg:flex flex-col bg-white border-r border-slate-200/80 h-full shrink-0 transition-all duration-300 z-30 select-none',
         sidebarCollapsed ? 'w-20' : 'w-64'
       )}
     >

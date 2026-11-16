@@ -75,12 +75,12 @@ export function Pagination({
         <span className="font-semibold text-slate-700">{totalItems}</span> results
       </div>
 
-      <div className="flex items-center space-x-1">
+      <div className="flex flex-wrap items-center justify-center gap-1">
         {/* First Page */}
         <Button
           variant="outline"
           size="sm"
-          className="h-8 w-8 p-0"
+          className="hidden sm:inline-flex h-8 w-8 p-0"
           onClick={() => onPageChange(1)}
           disabled={currentPage <= 1}
           title="First Page"
@@ -108,7 +108,7 @@ export function Pagination({
             return (
               <span
                 key={`ellipsis-${idx}`}
-                className="h-8 w-8 flex items-center justify-center text-slate-400 font-bold select-none text-xs"
+                className="hidden sm:flex h-8 w-8 items-center justify-center text-slate-400 font-bold select-none text-xs"
               >
                 ...
               </span>
@@ -126,7 +126,7 @@ export function Pagination({
               className={`h-8 w-8 p-0 text-xs font-medium transition-all ${
                 isCurrent
                   ? 'bg-red-600 hover:bg-red-700 text-white font-bold shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-100 border-slate-200'
+                  : 'hidden sm:inline-flex text-slate-700 hover:bg-slate-100 border-slate-200'
               }`}
               onClick={() => onPageChange(pageNum)}
             >
@@ -134,6 +134,8 @@ export function Pagination({
             </Button>
           );
         })}
+
+        <span className="sm:hidden px-2 text-xs text-slate-500">of {totalPages}</span>
 
         {/* Next Page */}
         <Button
@@ -152,7 +154,7 @@ export function Pagination({
         <Button
           variant="outline"
           size="sm"
-          className="h-8 w-8 p-0"
+          className="hidden sm:inline-flex h-8 w-8 p-0"
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage >= totalPages}
           title="Last Page"

@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Loader2,
 } from 'lucide-react';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -219,7 +220,40 @@ export function CategoriesPage() {
                   />
                 </div>
               ) : (
-                <Table>
+                <>
+<MobileList>
+  {categories.map((cat) => (
+    <MobileRow key={cat.id}>
+      <div className="flex items-center gap-3">
+        <div className="h-11 w-11 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center text-slate-400">
+          {cat.image ? (
+            <img src={cat.image} alt={cat.name} className="h-full w-full object-cover" />
+          ) : (
+            <FolderTree className="h-4 w-4" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-slate-800 truncate">{cat.name}</div>
+          <div className="font-mono text-[11px] text-slate-400 truncate">{cat.slug}</div>
+        </div>
+        <span className="inline-block px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 font-semibold text-xs border border-red-100 shrink-0">
+          {cat.count}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setCategoryToDelete({ id: cat.id, name: cat.name })}
+          className="h-9 w-9 text-slate-400 hover:text-red-600 shrink-0"
+          title="Remove category"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-14">Image</TableHead>
@@ -282,6 +316,8 @@ export function CategoriesPage() {
                     ))}
                   </TableBody>
                 </Table>
+</TableOnly>
+</>
               )}
             </CardContent>
           </Card>

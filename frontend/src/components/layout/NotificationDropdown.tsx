@@ -50,7 +50,7 @@ export function NotificationDropdown() {
           <span className="sr-only">Notifications</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-80 max-w-[calc(100vw-1rem)] p-0">
         <div className="flex items-center justify-between p-3 border-b border-slate-100">
           <div>
             <div className="text-sm font-semibold text-slate-800">Notifications</div>

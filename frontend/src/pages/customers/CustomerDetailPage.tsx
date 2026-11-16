@@ -12,6 +12,7 @@ import {
   Edit,
   ExternalLink,
 } from 'lucide-react';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,12 +38,13 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
 import { STICKY_COLUMN } from '@/utils/sticky';
+import { PageLoading } from '@/components/ui/page-loading';
 import { toast } from 'sonner';
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { customers, updateCustomerAddress } = useCustomerStore();
+  const { customers, updateCustomerAddress, loaded: customersLoaded } = useCustomerStore();
   const { orders } = useOrderStore();
 
   const customer = customers.find((c) => c.id === id);
@@ -67,6 +69,8 @@ export function CustomerDetailPage() {
       phone: '',
     }
   );
+
+  if (!customer && !customersLoaded) return <PageLoading label="Loading customer..." />;
 
   if (!customer) {
     return (
@@ -162,9 +166,9 @@ export function CustomerDetailPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-2">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Lifetime Value (LTV)
@@ -180,7 +184,7 @@ export function CustomerDetailPage() {
         </Card>
 
         <Card>
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-4 sm:p-5 flex items-center justify-between gap-2">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Total Orders
@@ -217,7 +221,25 @@ export function CustomerDetailPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto w-full">
-                  <Table>
+                  <>
+<MobileList>
+  {customerOrders.map((ord) => (
+    <MobileRow key={ord.id} onClick={() => navigate(`/orders/${ord.id}`)}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono font-bold text-slate-900 text-sm">{ord.orderNumber}</span>
+          {getOrderStatusBadge(ord.status)}
+        </div>
+        <span className="font-bold text-slate-900 shrink-0">{formatCurrency(ord.total, ord.currency)}</span>
+      </div>
+      <div className="text-xs text-slate-500">
+        {formatDate(ord.dateCreated)} · {ord.items.length} {ord.items.length === 1 ? 'item' : 'items'}
+      </div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Order</TableHead>
@@ -255,6 +277,8 @@ export function CustomerDetailPage() {
                       ))}
                     </TableBody>
                   </Table>
+</TableOnly>
+</>
                 </div>
               )}
             </CardContent>

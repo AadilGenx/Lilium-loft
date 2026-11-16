@@ -200,12 +200,13 @@ export function ShippingPage() {
                   >
                     <div>
                       <div className="text-sm font-semibold">{zone.name}</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {zone.regions.join(', ')}
+                      <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-2">
+                        {zone.regions.slice(0, 6).join(', ')}
+                        {zone.regions.length > 6 ? ` +${zone.regions.length - 6} more` : ''}
                       </div>
                     </div>
-                    <Badge variant={isSelected ? 'default' : 'outline'} className="text-[10px]">
-                      {zone.methods.length} methods
+                    <Badge variant={isSelected ? 'default' : 'outline'} className="text-[10px] whitespace-nowrap shrink-0 ml-2">
+                      {zone.methods.length} {zone.methods.length === 1 ? 'method' : 'methods'}
                     </Badge>
                   </button>
                 );
@@ -223,7 +224,7 @@ export function ShippingPage() {
                   {currentZone.name} Methods
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Region coverage: {currentZone.regions.join(', ')}
+                  Region coverage: {currentZone.regions.slice(0, 6).join(', ')}{currentZone.regions.length > 6 ? ` +${currentZone.regions.length - 6} more` : ''}
                 </CardDescription>
               </div>
               <Button

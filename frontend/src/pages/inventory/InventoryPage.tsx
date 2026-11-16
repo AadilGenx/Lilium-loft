@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useProductStore } from '@/store';
 import { Product } from '@/types';
@@ -181,7 +182,7 @@ export function InventoryPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card
           onClick={() => {
             setFilterTab('all');
@@ -191,7 +192,7 @@ export function InventoryPage() {
             filterTab === 'all' ? 'border-red-500 ring-1 ring-red-500' : 'hover:border-slate-300'
           }`}
         >
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 All Products
@@ -200,7 +201,7 @@ export function InventoryPage() {
                 {counts.total}
               </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-lg bg-slate-100 text-slate-600 hidden sm:flex items-center justify-center">
               <Boxes className="h-5 w-5" />
             </div>
           </CardContent>
@@ -215,7 +216,7 @@ export function InventoryPage() {
             filterTab === 'in' ? 'border-emerald-500 ring-1 ring-emerald-500' : 'hover:border-slate-300'
           }`}
         >
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 In Stock
@@ -224,7 +225,7 @@ export function InventoryPage() {
                 {counts.inStock}
               </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-600 hidden sm:flex items-center justify-center">
               <CheckCircle2 className="h-5 w-5" />
             </div>
           </CardContent>
@@ -239,7 +240,7 @@ export function InventoryPage() {
             filterTab === 'low' ? 'border-amber-500 ring-1 ring-amber-500' : 'hover:border-slate-300'
           }`}
         >
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Low Stock
@@ -248,7 +249,7 @@ export function InventoryPage() {
                 {counts.lowStock}
               </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 hidden sm:flex items-center justify-center">
               <AlertTriangle className="h-5 w-5" />
             </div>
           </CardContent>
@@ -263,7 +264,7 @@ export function InventoryPage() {
             filterTab === 'out' ? 'border-red-500 ring-1 ring-red-500' : 'hover:border-slate-300'
           }`}
         >
-          <CardContent className="p-5 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-5 flex items-center justify-between">
             <div>
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Out of Stock
@@ -272,7 +273,7 @@ export function InventoryPage() {
                 {counts.outOfStock}
               </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-lg bg-red-50 text-red-600 hidden sm:flex items-center justify-center">
               <XCircle className="h-5 w-5" />
             </div>
           </CardContent>
@@ -341,12 +342,62 @@ export function InventoryPage() {
               />
             </div>
           ) : (
-            <Table>
+            <>
+<MobileList>
+  {paginatedProducts.map((p) => {
+    const state = stockOf(p);
+    return (
+      <MobileRow key={p.id}>
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center">
+            {p.images[0] ? (
+              <img src={p.images[0].src} alt={p.name} className="h-full w-full object-cover" />
+            ) : (
+              <Package className="h-5 w-5 text-slate-400" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-slate-900 line-clamp-2">{p.name}</div>
+            <div className="text-xs text-slate-400 truncate">
+              {p.sku ? `SKU ${p.sku}` : p.categories.join(', ')}
+            </div>
+          </div>
+          <span className="font-semibold text-slate-900 text-sm shrink-0">{formatMoney(p.price)}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {state === 'out' ? (
+            <Badge variant="destructive">Out of Stock</Badge>
+          ) : state === 'backorder' ? (
+            <Badge variant="warning">On Backorder</Badge>
+          ) : state === 'low' ? (
+            <Badge variant="warning">Low Stock</Badge>
+          ) : (
+            <Badge variant="success">In Stock</Badge>
+          )}
+          <span className="text-xs font-mono font-bold text-slate-700">
+            {p.manageStock ? `${p.stockQuantity} units` : 'Not tracked'}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openAdjustModal(p)}
+            className="ml-auto gap-1.5 text-xs bg-white text-slate-700"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            <span>Adjust</span>
+          </Button>
+        </div>
+      </MobileRow>
+    );
+  })}
+</MobileList>
+<TableOnly>
+<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Image</TableHead>
                   <TableHead>Product Name</TableHead>
-                  <TableHead>SKU</TableHead>
+                  <TableHead className="hidden lg:table-cell">SKU</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Stock Level</TableHead>
                   <TableHead>Condition</TableHead>
@@ -378,7 +429,7 @@ export function InventoryPage() {
                           {p.categories.join(', ')}
                         </span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-slate-600">
+                      <TableCell className="hidden lg:table-cell font-mono text-xs text-slate-600">
                         {p.sku}
                       </TableCell>
                       <TableCell className="font-semibold text-slate-900">
@@ -424,6 +475,8 @@ export function InventoryPage() {
                 })}
               </TableBody>
             </Table>
+</TableOnly>
+</>
           )}
 
           <Pagination

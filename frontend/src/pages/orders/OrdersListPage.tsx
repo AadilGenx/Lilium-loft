@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useOrderStore } from '@/store';
 import { Order, OrderStatus } from '@/types';
@@ -294,15 +295,39 @@ export function OrdersListPage() {
               />
             </div>
           ) : (
-            <Table>
+            <>
+<MobileList>
+  {paginatedOrders.map((order) => (
+    <MobileRow key={order.id} onClick={() => navigate(`/orders/${order.id}`)}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono font-bold text-slate-900">{order.orderNumber}</span>
+          {getStatusBadge(order.status)}
+        </div>
+        <span className="font-bold text-slate-900 shrink-0">
+          {formatCurrency(order.total, order.currency)}
+        </span>
+      </div>
+      <div className="text-sm text-slate-800 truncate">{order.customerName}</div>
+      <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+        <span>
+          {formatDate(order.dateCreated)} · {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
+        </span>
+        {order.paymentMethodTitle && <span className="truncate">{order.paymentMethodTitle}</span>}
+      </div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-24">Order</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead>Payment Method</TableHead>
+                  <TableHead className="hidden lg:table-cell">Items</TableHead>
+                  <TableHead className="hidden lg:table-cell">Payment Method</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="w-12 text-right"></TableHead>
                 </TableRow>
@@ -329,11 +354,11 @@ export function OrdersListPage() {
                         {order.customerEmail}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600">
+                    <TableCell className="hidden lg:table-cell text-xs text-slate-600">
                       {order.items.length}{' '}
                       {order.items.length === 1 ? 'item' : 'items'}
                     </TableCell>
-                    <TableCell className="text-xs text-slate-600">
+                    <TableCell className="hidden lg:table-cell text-xs text-slate-600">
                       {order.paymentMethodTitle}
                     </TableCell>
                     <TableCell className="text-right font-bold text-slate-900">
@@ -346,6 +371,8 @@ export function OrdersListPage() {
                 ))}
               </TableBody>
             </Table>
+</TableOnly>
+</>
           )}
 
           <Pagination

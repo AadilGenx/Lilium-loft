@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Calendar } from 'lucide-react';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -202,9 +203,9 @@ export function ReportsPage() {
 
         {/* Sales Performance Tab */}
         <TabsContent value="sales" className="space-y-6 mt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card>
-              <CardContent className="p-5">
+              <CardContent className="p-3 sm:p-5">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Gross Sales
                 </span>
@@ -218,7 +219,7 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardContent className="p-5">
+              <CardContent className="p-3 sm:p-5">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Net Sales
                 </span>
@@ -230,7 +231,7 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardContent className="p-5">
+              <CardContent className="p-3 sm:p-5">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Orders Placed
                 </span>
@@ -246,7 +247,7 @@ export function ReportsPage() {
             </Card>
 
             <Card>
-              <CardContent className="p-5">
+              <CardContent className="p-3 sm:p-5">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Avg. Order Value (AOV)
                 </span>
@@ -275,7 +276,7 @@ export function ReportsPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={salesSeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 11 }} />
+                      <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 11 }} minTickGap={24} />
                       <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
                       <Tooltip
                         formatter={(val: number) => formatCurrency(val)}
@@ -333,7 +334,20 @@ export function ReportsPage() {
                 {categories.length === 0 ? (
                   noData('No category sales in this period')
                 ) : (
-                  <Table>
+                  <>
+<MobileList>
+  {categories.map((c) => (
+    <MobileRow key={c.category_woo_id} className="py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold text-slate-800 truncate">{c.name}</span>
+        <span className="font-bold text-slate-900 shrink-0">{formatCurrency(c.revenue)}</span>
+      </div>
+      <span className="text-xs text-slate-500">{c.units} units sold</span>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Category</TableHead>
@@ -353,6 +367,8 @@ export function ReportsPage() {
                       ))}
                     </TableBody>
                   </Table>
+</TableOnly>
+</>
                 )}
               </CardContent>
             </Card>
@@ -367,7 +383,20 @@ export function ReportsPage() {
               {products.length === 0 ? (
                 noData('No product sales in this period')
               ) : (
-                <Table>
+                <>
+<MobileList>
+  {products.map((p) => (
+    <MobileRow key={p.product_woo_id} className="py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+        <span className="font-bold text-slate-900 shrink-0">{formatCurrency(p.revenue)}</span>
+      </div>
+      <span className="text-xs text-slate-500">{p.units} units sold · {p.orders} {p.orders === 1 ? 'order' : 'orders'}</span>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
@@ -389,6 +418,8 @@ export function ReportsPage() {
                     ))}
                   </TableBody>
                 </Table>
+</TableOnly>
+</>
               )}
             </CardContent>
           </Card>
@@ -407,7 +438,22 @@ export function ReportsPage() {
               {customers.length === 0 ? (
                 noData('No customer orders in this period')
               ) : (
-                <Table>
+                <>
+<MobileList>
+  {customers.map((c) => (
+    <MobileRow key={c.email} className="py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold text-slate-800 truncate">{c.name || c.email}</span>
+        <span className="font-bold text-slate-900 shrink-0">{formatCurrency(c.total_spent)}</span>
+      </div>
+      <span className="text-xs text-slate-500 truncate">
+        {c.name ? `${c.email} · ` : ''}{c.orders} {c.orders === 1 ? 'order' : 'orders'} · last {formatDate(c.last_order_at)}
+      </span>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Customer</TableHead>
@@ -431,6 +477,8 @@ export function ReportsPage() {
                     ))}
                   </TableBody>
                 </Table>
+</TableOnly>
+</>
               )}
             </CardContent>
           </Card>

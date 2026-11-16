@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Pagination } from '@/components/ui/pagination';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useCustomerStore } from '@/store';
 import { Customer } from '@/types';
@@ -198,12 +199,38 @@ export function CustomersListPage() {
               />
             </div>
           ) : (
-            <Table>
+            <>
+<MobileList>
+  {paginatedCustomers.map((customer) => (
+    <MobileRow key={customer.id} onClick={() => navigate(`/customers/${customer.id}`)}>
+      <div className="flex items-center gap-3">
+        <div className="h-11 w-11 rounded-full bg-slate-200 border border-slate-200 shrink-0 flex items-center justify-center text-xs font-semibold text-slate-600">
+          {initials(customer.firstName, customer.lastName)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-slate-900 text-sm truncate">
+            {customer.firstName} {customer.lastName}
+          </div>
+          <div className="text-xs text-slate-400 truncate">{customer.email}</div>
+        </div>
+        <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+      </div>
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>
+          {customer.totalOrders} {customer.totalOrders === 1 ? 'order' : 'orders'} · joined {formatDate(customer.registeredDate)}
+        </span>
+        <span className="font-bold text-slate-900 text-sm">{formatCurrency(customer.totalSpent)}</span>
+      </div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-14">Avatar</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Username</TableHead>
+                  <TableHead className="hidden lg:table-cell">Username</TableHead>
                   <TableHead>Registered</TableHead>
                   <TableHead className="text-center">Orders</TableHead>
                   <TableHead className="text-right">Total Spent</TableHead>
@@ -230,7 +257,7 @@ export function CustomersListPage() {
                         {customer.email}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-slate-500">
+                    <TableCell className="hidden lg:table-cell font-mono text-xs text-slate-500">
                       {customer.username ? `@${customer.username}` : ''}
                     </TableCell>
                     <TableCell className="text-xs text-slate-500">
@@ -251,6 +278,8 @@ export function CustomersListPage() {
                 ))}
               </TableBody>
             </Table>
+</TableOnly>
+</>
           )}
 
           <Pagination

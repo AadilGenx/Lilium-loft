@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useProductStore } from '@/store';
@@ -135,20 +136,20 @@ export function ProductsListPage() {
   const getStockBadge = (prod: Product) => {
     const state = stockOf(prod);
     if (state === 'out') {
-      return <Badge variant="destructive">Out of Stock</Badge>;
+      return <Badge variant="destructive" className="whitespace-nowrap">Out of Stock</Badge>;
     }
     if (state === 'backorder') {
-      return <Badge variant="warning">On Backorder</Badge>;
+      return <Badge variant="warning" className="whitespace-nowrap">On Backorder</Badge>;
     }
     if (state === 'low') {
       return (
-        <Badge variant="warning">
+        <Badge variant="warning" className="whitespace-nowrap">
           Low Stock ({prod.stockQuantity})
         </Badge>
       );
     }
     return (
-      <Badge variant="success">
+      <Badge variant="success" className="whitespace-nowrap">
         {prod.manageStock ? `In Stock (${prod.stockQuantity})` : 'In Stock'}
       </Badge>
     );
@@ -281,16 +282,72 @@ export function ProductsListPage() {
               />
             </div>
           ) : (
-            <Table>
+            <>
+<MobileList>
+  {paginatedProducts.map((product) => (
+    <MobileRow key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
+      <div className="flex items-center gap-3">
+        <div className="h-14 w-14 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center">
+          {product.images[0] ? (
+            <img src={product.images[0].src} alt={product.name} className="h-full w-full object-cover" />
+          ) : (
+            <Package className="h-5 w-5 text-slate-400" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-slate-900 line-clamp-2">{product.name}</div>
+          <div className="text-xs text-slate-400 truncate">
+            {product.sku ? `SKU ${product.sku}` : product.categories.join(', ')}
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <MoreVertical className="h-4 w-4 text-slate-500" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={() => navigate(`/products/${product.id}`)} className="gap-2">
+              <Eye className="h-4 w-4 text-slate-500" />
+              <span>View Details</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/products/${product.id}/edit`)} className="gap-2">
+              <Edit className="h-4 w-4 text-slate-500" />
+              <span>Edit Product</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setProductToDelete(product)}
+              className="gap-2 text-red-600 focus:text-red-700 focus:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {getStockBadge(product)}
+        <ProductStatusBadge status={product.status} />
+        <span className="ml-auto font-semibold text-slate-900">
+          {product.type === 'variable' && product.price !== undefined ? 'From ' : ''}
+          {formatMoney(product.price)}
+        </span>
+      </div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Image</TableHead>
                   <TableHead>Product Name</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead className="hidden lg:table-cell">SKU</TableHead>
+                  <TableHead className="hidden lg:table-cell">Type</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Price</TableHead>
-                  <TableHead>Categories</TableHead>
+                  <TableHead className="hidden lg:table-cell">Categories</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-12 text-right">Actions</TableHead>
                 </TableRow>
@@ -323,18 +380,18 @@ export function ProductsListPage() {
                       >
                         {product.name}
                       </button>
-                      <span className="text-[11px] text-slate-400 block mt-0.5">
+                      <span className="hidden lg:block text-[11px] text-slate-400 mt-0.5">
                         Slug: {product.slug}
                       </span>
                     </TableCell>
 
                     {/* SKU */}
-                    <TableCell className="font-mono text-xs text-slate-600">
+                    <TableCell className="hidden lg:table-cell font-mono text-xs text-slate-600">
                       {product.sku}
                     </TableCell>
 
                     {/* Type */}
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {product.type === 'variable' ? (
                         <Badge variant="purple" className="text-[10px]">
                           Variable
@@ -363,7 +420,7 @@ export function ProductsListPage() {
                     </TableCell>
 
                     {/* Categories */}
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {product.categories.slice(0, 2).map((cat) => (
                           <span
@@ -419,6 +476,8 @@ export function ProductsListPage() {
                 ))}
               </TableBody>
             </Table>
+</TableOnly>
+</>
           )}
 
           {/* Pagination */}

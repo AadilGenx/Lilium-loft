@@ -82,7 +82,7 @@ export function StockAlertDropdown() {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80 p-0">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-80 max-w-[calc(100vw-1rem)] p-0">
         <div className="p-3 border-b border-slate-100">
           <div className="text-sm font-semibold text-slate-800">Stock alerts</div>
           <div className="text-xs text-slate-500">
@@ -111,10 +111,13 @@ export function StockAlertDropdown() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-800 truncate">{product.name}</p>
-                  <p className="text-[11px] text-slate-400 truncate">
-                    {product.sku ? `SKU ${product.sku}` : 'No SKU'}
-                    {kind === 'low' && level !== undefined ? ` · alert level ${level}` : ''}
-                  </p>
+                  {(product.sku || (kind === 'low' && level !== undefined)) && (
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {[product.sku && `SKU ${product.sku}`, kind === 'low' && level !== undefined && `alert level ${level}`]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`shrink-0 rounded px-2 py-0.5 text-[11px] font-bold ${

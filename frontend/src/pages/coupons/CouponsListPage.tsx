@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Copy,
 } from 'lucide-react';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -244,12 +245,58 @@ export function CouponsListPage() {
               />
             </div>
           ) : (
-            <Table>
+            <>
+<MobileList>
+  {filteredCoupons.map((coupon) => (
+    <MobileRow key={coupon.id}>
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => handleCopyCode(coupon.code)}
+          className="flex items-center gap-1.5 font-mono font-bold text-sm bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md min-w-0"
+          title="Tap to copy code"
+        >
+          <span className="truncate">{coupon.code}</span>
+          <Copy className="h-3 w-3 opacity-60 shrink-0" />
+        </button>
+        {coupon.status === 'active' ? (
+          <Badge variant="success">Active</Badge>
+        ) : coupon.status === 'expired' ? (
+          <Badge variant="outline">Expired</Badge>
+        ) : (
+          <Badge variant="secondary">Draft</Badge>
+        )}
+      </div>
+      <div className="font-semibold text-slate-900">
+        {formatDiscount(coupon.discountType, coupon.amount)}
+        <span className="ml-2 text-[11px] font-normal text-slate-400 capitalize">
+          {coupon.discountType.replace('_', ' ')}
+        </span>
+      </div>
+      {coupon.description && <div className="text-xs text-slate-600 line-clamp-2">{coupon.description}</div>}
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>
+          Used {coupon.usageCount} / {coupon.usageLimit ? coupon.usageLimit : '∞'} ·{' '}
+          {coupon.expiryDate ? `expires ${formatDate(coupon.expiryDate)}` : 'never expires'}
+        </span>
+        <span className="flex shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => openEditModal(coupon)} className="h-9 w-9 text-slate-500">
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setCouponToDelete(coupon)} className="h-9 w-9 text-slate-400 hover:text-red-600">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </span>
+      </div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Coupon Code</TableHead>
                   <TableHead>Discount</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead className="hidden lg:table-cell">Description</TableHead>
                   <TableHead>Usage / Limit</TableHead>
                   <TableHead>Expiry Date</TableHead>
                   <TableHead>Status</TableHead>
@@ -277,7 +324,7 @@ export function CouponsListPage() {
                       </span>
                     </TableCell>
 
-                    <TableCell className="text-xs text-slate-600 max-w-xs">
+                    <TableCell className="hidden lg:table-cell text-xs text-slate-600 max-w-xs">
                       {coupon.description}
                     </TableCell>
 
@@ -327,6 +374,8 @@ export function CouponsListPage() {
                 ))}
               </TableBody>
             </Table>
+</TableOnly>
+</>
           )}
         </CardContent>
       </Card>

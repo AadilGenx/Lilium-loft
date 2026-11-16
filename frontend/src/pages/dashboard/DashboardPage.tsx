@@ -183,10 +183,10 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Revenue */}
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-3 sm:p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Total Sales
@@ -227,7 +227,7 @@ export function DashboardPage() {
 
         {/* Total Orders */}
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-3 sm:p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Orders
@@ -252,7 +252,7 @@ export function DashboardPage() {
 
         {/* Active Products */}
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-3 sm:p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Catalog Items
@@ -281,7 +281,7 @@ export function DashboardPage() {
 
         {/* Customers */}
         <Card>
-          <CardContent className="p-5">
+          <CardContent className="p-3 sm:p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Customers
@@ -306,7 +306,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sales Chart */}
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2">
             <div>
               <CardTitle className="text-base font-semibold text-slate-900">
                 Gross Revenue & Sales
@@ -431,7 +431,7 @@ export function DashboardPage() {
                       <p className="text-xs font-semibold text-slate-800 truncate max-w-[140px]">
                         {p.name}
                       </p>
-                      <p className="text-[11px] text-slate-400">SKU: {p.sku}</p>
+                      {p.sku && <p className="text-[11px] text-slate-400">SKU: {p.sku}</p>}
                     </div>
                   </div>
                   <div className="text-right">
@@ -491,12 +491,12 @@ export function DashboardPage() {
                   onClick={() => navigate(`/orders/${order.id}`)}
                   className="flex items-center justify-between p-4 hover:bg-slate-50/70 cursor-pointer transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 font-semibold text-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-9 min-w-9 px-1 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700 font-semibold text-xs">
                       {order.orderNumber}
                     </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-800">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">
                         {order.customerName}
                       </p>
                       <p className="text-[11px] text-slate-400">
@@ -505,12 +505,12 @@ export function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3 shrink-0 pl-2">
                     {getOrderStatusBadge(order.status)}
-                    <span className="text-xs font-bold text-slate-800 w-16 text-right">
+                    <span className="text-xs font-bold text-slate-800 sm:min-w-20 text-right">
                       {formatCurrency(order.total, order.currency)}
                     </span>
-                    <ArrowUpRight className="h-4 w-4 text-slate-400" />
+                    <ArrowUpRight className="hidden sm:block h-4 w-4 text-slate-400" />
                   </div>
                 </div>
               ))}

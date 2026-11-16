@@ -49,7 +49,7 @@ export function Breadcrumbs() {
   }
 
   return (
-    <nav className="flex items-center space-x-1.5 text-xs text-slate-500 mb-4 overflow-x-auto whitespace-nowrap py-0.5 scrollbar-none">
+    <nav className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-500 mb-4 py-0.5">
       <Link
         to="/"
         className="flex items-center hover:text-red-600 transition-colors text-slate-400"
@@ -69,9 +69,9 @@ export function Breadcrumbs() {
           <React.Fragment key={to}>
             <ChevronRight className="h-3 w-3 text-slate-300" />
             {isLast ? (
-              <span className="font-semibold text-slate-800 capitalize">{name}</span>
+              <span className="font-semibold text-slate-800 capitalize truncate max-w-[14rem] sm:max-w-md">{name}</span>
             ) : (
-              <Link to={to} className="hover:text-red-600 transition-colors capitalize">
+              <Link to={to} className="hover:text-red-600 transition-colors capitalize truncate max-w-[8rem] sm:max-w-xs">
                 {name}
               </Link>
             )}

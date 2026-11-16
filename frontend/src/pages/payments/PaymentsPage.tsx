@@ -10,6 +10,7 @@ import {
   Download,
   ExternalLink,
 } from 'lucide-react';
+import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -282,7 +283,31 @@ export function PaymentsPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto w-full">
-                <Table>
+                <>
+<MobileList>
+  {transactions.length === 0 && (
+    <div className="p-8 text-center text-xs text-slate-400">No transactions yet.</div>
+  )}
+  {transactions.map((tx) => (
+    <MobileRow key={tx.id}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono font-bold text-slate-900 text-sm">{tx.orderNumber}</span>
+          {getStatusBadge(tx.status)}
+        </div>
+        <span className="font-bold text-slate-900 shrink-0">{formatCurrency(tx.amount, tx.currency)}</span>
+      </div>
+      <div className="text-sm text-slate-800 truncate">{tx.customerName}</div>
+      <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+        <span className="truncate">{tx.paymentMethod}</span>
+        <span className="shrink-0">{formatDateTime(tx.date)}</span>
+      </div>
+      <div className="font-mono text-[11px] text-slate-400 truncate">{tx.transactionReference || '—'}</div>
+    </MobileRow>
+  ))}
+</MobileList>
+<TableOnly>
+<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Reference ID</TableHead>
@@ -327,6 +352,8 @@ export function PaymentsPage() {
                     ))}
                   </TableBody>
                 </Table>
+</TableOnly>
+</>
               </div>
             </CardContent>
           </Card>
