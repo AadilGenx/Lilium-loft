@@ -147,6 +147,82 @@ class WriteEndpointsTest extends TestCase
         $this->assertDatabaseMissing('woo_products', ['woo_id' => 10]);
     }
 
+    public function test_the_trash_lists_trashed_products_live_and_shows_the_status_they_had(): void
+    {
+        $this->writer();
+        $this->allow('products.delete');
+        $product = $this->product(['status' => 'private']);
+        Http::fake([
+            'shop.test/wp-json/wc/v3/products/10*' => Http::response(['id' => 10]),
+            'shop.test/wp-json/wc/v3/products?*' => Http::response([
+                ['id' => 10, 'name' => 'Old', 'slug' => 'old__trashed', 'sku' => '', 'type' => 'simple', 'status' => 'trash', 'price' => '100', 'regular_price' => '100', 'sale_price' => '', 'categories' => [], 'images' => []],
+                ['id' => 11, 'name' => 'Elsewhere', 'slug' => 'e__trashed', 'sku' => '', 'type' => 'simple', 'status' => 'trash', 'price' => '', 'regular_price' => '', 'sale_price' => '', 'categories' => [], 'images' => []],
+            ]),
+        ]);
+        $this->deleteJson("/api/v1/products/{$product->id}")->assertStatus(204);
+
+        $this->getJson('/api/v1/products/trash')->assertOk()
+            ->assertJsonPath('data.0.woo_id', 10)->assertJsonPath('data.0.previous_status', 'private')
+            ->assertJsonPath('data.1.previous_status', null);
+        Http::assertSent(fn (Request $r) => $r->method() === 'GET' && str_contains($r->url(), 'status=trash'));
+    }
+
+    public function test_restoring_puts_back_the_status_it_had_and_the_original_slug(): void
+    {
+        $this->writer();
+        $this->allow('products.delete');
+        $product = $this->product(['status' => 'private']);
+        $trashed = ['id' => 10, 'name' => 'Old', 'slug' => 'old__trashed', 'type' => 'simple', 'status' => 'trash', 'sku' => '', 'categories' => []];
+        Http::fake([
+            'shop.test/wp-json/wc/v3/products/10' => Http::sequence()
+                ->push(['id' => 10]) // DELETE
+                ->push($trashed)      // GET (is it in the trash?)
+                ->push(['id' => 10, 'name' => 'Old', 'slug' => 'old', 'type' => 'simple', 'status' => 'private', 'sku' => '', 'categories' => []]), // PUT
+        ]);
+        $this->deleteJson("/api/v1/products/{$product->id}")->assertStatus(204);
+
+        $this->postJson('/api/v1/products/trash/10/restore')->assertOk()->assertJsonPath('status', 'private');
+
+        Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && $r['status'] === 'private' && $r['slug'] === 'old');
+        $this->assertDatabaseHas('woo_products', ['woo_id' => 10, 'status' => 'private']);
+        $this->assertDatabaseHas('woo_write_audits', ['resource' => 'products', 'action' => 'restore', 'status' => 'success']);
+    }
+
+    public function test_a_product_trashed_elsewhere_needs_a_status_to_be_restored(): void
+    {
+        $this->writer();
+        $this->allow('products.delete');
+        Http::fake(['shop.test/wp-json/wc/v3/products/11' => Http::response(['id' => 11, 'status' => 'trash', 'slug' => 'e', 'name' => 'E', 'type' => 'simple', 'categories' => []])]);
+
+        $this->postJson('/api/v1/products/trash/11/restore')->assertStatus(422)->assertJsonValidationErrors('status');
+        Http::assertNotSent(fn (Request $r) => $r->method() === 'PUT');
+    }
+
+    public function test_restoring_needs_the_write_switch(): void
+    {
+        $this->writer();
+        Http::fake();
+
+        $this->postJson('/api/v1/products/trash/10/restore')->assertStatus(403);
+        Http::assertNothingSent();
+    }
+
+    public function test_updating_a_category_sends_only_the_changes_and_refreshes_the_mirror_with_its_description(): void
+    {
+        $this->writer();
+        $this->allow('categories.update');
+        $category = WooCategory::create(['woo_id' => 7, 'name' => 'Shirts', 'slug' => 'shirts']);
+        Http::fake(['shop.test/wp-json/wc/v3/products/categories/7' => Http::response([
+            'id' => 7, 'name' => 'Linen shirts', 'slug' => 'shirts', 'description' => 'Light and breathable', 'parent' => 0, 'count' => 3,
+        ])]);
+
+        $this->patchJson("/api/v1/categories/{$category->id}", ['name' => 'Linen shirts', 'description' => 'Light and breathable'])
+            ->assertOk()->assertJsonPath('name', 'Linen shirts')->assertJsonPath('description', 'Light and breathable');
+
+        Http::assertSent(fn (Request $r) => $r->method() === 'PUT' && $r['name'] === 'Linen shirts' && ! isset($r['slug']));
+        $this->assertDatabaseHas('woo_categories', ['woo_id' => 7, 'name' => 'Linen shirts', 'description' => 'Light and breathable']);
+    }
+
     public function test_deleting_a_customer_needs_the_permanent_delete_switch(): void
     {
         $this->writer();

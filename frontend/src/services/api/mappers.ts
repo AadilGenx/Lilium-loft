@@ -216,6 +216,7 @@ export function mapBackendCategory(c: BackendCategory): ProductCategory {
     wooId: c.woo_id,
     name: c.name,
     slug: c.slug,
+    description: c.description ?? undefined,
     count: c.products_count,
     image: c.image_url ?? undefined,
   };

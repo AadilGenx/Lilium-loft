@@ -18,6 +18,7 @@ import {
   Layers,
   PlusCircle,
   FolderTree,
+  Trash2,
 } from 'lucide-react';
 import { useUIStore } from '@/store';
 import { cn } from '@/utils/cn';
@@ -49,6 +50,7 @@ export function MobileNav() {
         { title: 'All Products', href: '/products', icon: Layers },
         { title: 'Add New', href: '/products/new', icon: PlusCircle },
         { title: 'Categories', href: '/products/categories', icon: FolderTree },
+        { title: 'Trash', href: '/products/trash', icon: Trash2 },
       ],
     },
     { title: 'Orders', href: '/orders', icon: ShoppingCart },

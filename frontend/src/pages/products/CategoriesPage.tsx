@@ -3,6 +3,7 @@ import {
   FolderTree,
   Plus,
   Trash2,
+  Pencil,
   Edit2,
   Tag,
   Package,
@@ -27,6 +28,8 @@ import { useCategoryStore } from '@/store';
 import { getErrorMessage } from '@/utils/errors';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { STICKY_COLUMN } from '@/utils/sticky';
+import { EditCategoryDialog } from '@/components/products/EditCategoryDialog';
+import { ProductCategory } from '@/types';
 import { toast } from 'sonner';
 
 export function CategoriesPage() {
@@ -36,6 +39,7 @@ export function CategoriesPage() {
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<ProductCategory | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -242,6 +246,15 @@ export function CategoriesPage() {
         <Button
           variant="ghost"
           size="icon"
+          onClick={() => setCategoryToEdit(cat)}
+          className="h-9 w-9 text-slate-400 hover:text-slate-700 shrink-0"
+          title="Edit category"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => setCategoryToDelete({ id: cat.id, name: cat.name })}
           className="h-9 w-9 text-slate-400 hover:text-red-600 shrink-0"
           title="Remove category"
@@ -301,7 +314,16 @@ export function CategoriesPage() {
                             {cat.count}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setCategoryToEdit(cat)}
+                            className="h-8 w-8 text-slate-400 hover:text-slate-700"
+                            title="Edit category"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -323,6 +345,8 @@ export function CategoriesPage() {
           </Card>
         </div>
       </div>
+
+      <EditCategoryDialog category={categoryToEdit} onClose={() => setCategoryToEdit(null)} />
 
       <ConfirmDialog
         open={categoryToDelete !== null}

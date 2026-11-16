@@ -51,7 +51,7 @@ export function ProductFormPage() {
       slug: existingProduct?.slug ?? '',
       sku: existingProduct?.sku ?? '',
       type: existingProduct?.type ?? 'simple',
-      status: existingProduct?.status ?? 'draft',
+      status: existingProduct?.status ?? 'private',
       regularPrice: existingProduct?.regularPrice,
       salePrice: existingProduct?.salePrice,
       manageStock: existingProduct?.manageStock ?? false,
@@ -481,6 +481,9 @@ export function ProductFormPage() {
                       <SelectItem value="private">Private</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-slate-400">
+                    Private: saved in WooCommerce and visible only to store admins. Draft: not published yet.
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">

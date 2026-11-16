@@ -487,6 +487,32 @@ export function OrderDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
+              {/* Add Note Form: first, so it is the first thing seen in this card */}
+              <form onSubmit={handleAddNote} className="space-y-3 pb-4 border-b border-slate-100">
+                <Textarea
+                  placeholder="Write a note about this order (private unless ticked below)..."
+                  rows={3}
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  className="text-xs"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={isCustomerNote}
+                      onChange={(e) => setIsCustomerNote(e.target.checked)}
+                      className="rounded text-red-600 focus:ring-red-600"
+                    />
+                    <span>Visible to customer</span>
+                  </label>
+                  <Button type="submit" size="sm" disabled={!newNote.trim()} className="gap-1 bg-red-600 hover:bg-red-700 text-white text-xs h-8">
+                    <Send className="h-3 w-3" />
+                    <span>Add Note</span>
+                  </Button>
+                </div>
+              </form>
+
               {/* Notes timeline */}
               <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
                 {order.notes.length === 0 ? (
@@ -521,32 +547,6 @@ export function OrderDetailPage() {
                   ))
                 )}
               </div>
-
-              {/* Add Note Form */}
-              <form onSubmit={handleAddNote} className="space-y-3 pt-3 border-t border-slate-100">
-                <Textarea
-                  placeholder="Add a private note or customer message..."
-                  rows={2}
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  className="text-xs"
-                />
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={isCustomerNote}
-                      onChange={(e) => setIsCustomerNote(e.target.checked)}
-                      className="rounded text-red-600 focus:ring-red-600"
-                    />
-                    <span>Visible to customer</span>
-                  </label>
-                  <Button type="submit" size="sm" className="gap-1 bg-red-600 hover:bg-red-700 text-white text-xs h-8">
-                    <Send className="h-3 w-3" />
-                    <span>Add Note</span>
-                  </Button>
-                </div>
-              </form>
             </CardContent>
           </Card>
         </div>

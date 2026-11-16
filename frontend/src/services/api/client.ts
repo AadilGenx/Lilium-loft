@@ -88,7 +88,7 @@ function endSession() {
   }
 }
 
-export async function apiClient<T>(
+async function execute<T>(
   endpoint: string,
   options: RequestInit = {},
   retried = false
@@ -121,7 +121,7 @@ export async function apiClient<T>(
   const isAuthCall = /\/auth\/(login|refresh|logout)/.test(endpoint);
   if (response.status === 401 && token && !isAuthCall) {
     if (!retried && (await refreshSession())) {
-      return apiClient<T>(endpoint, options, true);
+      return execute<T>(endpoint, options, true);
     }
     endSession();
   }
@@ -142,4 +142,21 @@ export async function apiClient<T>(
   }
 
   return response.json();
+}
+
+/** GETs that are already on their way: the same request asked for twice at once is sent once. */
+const inFlight = new Map<string, Promise<unknown>>();
+
+export function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  if (method !== 'GET') return execute<T>(endpoint, options);
+
+  // Keyed by the token too, so a different session never shares an answer.
+  const key = `${getStoredToken() ?? ''} ${endpoint}`;
+  const running = inFlight.get(key);
+  if (running) return running as Promise<T>;
+
+  const request = execute<T>(endpoint, options).finally(() => inFlight.delete(key));
+  inFlight.set(key, request);
+  return request;
 }

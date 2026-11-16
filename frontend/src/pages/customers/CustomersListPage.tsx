@@ -10,6 +10,7 @@ import {
   IndianRupee,
   ChevronRight,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,7 @@ import { formatCurrency, formatDate } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
 import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
+import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
 import { toast } from 'sonner';
 
 export function CustomersListPage() {
@@ -51,6 +53,7 @@ export function CustomersListPage() {
 
   // Add customer modal
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -219,7 +222,18 @@ export function CustomersListPage() {
         <span>
           {customer.totalOrders} {customer.totalOrders === 1 ? 'order' : 'orders'} · joined {formatDate(customer.registeredDate)}
         </span>
-        <span className="font-bold text-slate-900 text-sm">{formatCurrency(customer.totalSpent)}</span>
+        <span className="flex items-center gap-1">
+          <span className="font-bold text-slate-900 text-sm">{formatCurrency(customer.totalSpent)}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Delete customer"
+            onClick={(e) => { e.stopPropagation(); setCustomerToDelete(customer); }}
+            className="h-9 w-9 text-slate-400 hover:text-red-600"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </span>
       </div>
     </MobileRow>
   ))}
@@ -234,7 +248,7 @@ export function CustomersListPage() {
                   <TableHead>Registered</TableHead>
                   <TableHead className="text-center">Orders</TableHead>
                   <TableHead className="text-right">Total Spent</TableHead>
-                  <TableHead className="w-12 text-right"></TableHead>
+                  <TableHead className="w-24 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -271,7 +285,16 @@ export function CustomersListPage() {
                     <TableCell className="text-right font-bold text-slate-900">
                       {formatCurrency(customer.totalSpent)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Delete customer"
+                        onClick={(e) => { e.stopPropagation(); setCustomerToDelete(customer); }}
+                        className="h-8 w-8 text-slate-400 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                       <ChevronRight className="h-4 w-4 text-slate-400 inline" />
                     </TableCell>
                   </TableRow>
@@ -291,6 +314,8 @@ export function CustomersListPage() {
           />
         </CardContent>
       </Card>
+
+      <DeleteCustomerDialog customer={customerToDelete} onClose={() => setCustomerToDelete(null)} />
 
       {/* Add Customer Modal */}
       <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>

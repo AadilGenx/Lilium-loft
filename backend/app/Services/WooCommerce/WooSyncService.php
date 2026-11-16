@@ -62,6 +62,7 @@ class WooSyncService
             'parent_woo_id' => $c['parent'] ?? 0,
             'name' => html_entity_decode($c['name']),
             'slug' => $c['slug'],
+            'description' => ($c['description'] ?? '') !== '' ? $c['description'] : null,
             'products_count' => $c['count'] ?? 0,
             'image_url' => $c['image']['src'] ?? null,
         ]);

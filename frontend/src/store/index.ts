@@ -408,6 +408,8 @@ interface CategoryStore {
   error: string | null;
   fetchCategories: (opts?: FetchOptions) => Promise<void>;
   createCategory: (input: { name: string; slug?: string; description?: string; image?: string }) => Promise<void>;
+  /** Only the fields in `changes` are sent to WooCommerce. */
+  updateCategory: (id: string, changes: { name?: string; slug?: string; description?: string; image?: string }) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 }
 
@@ -432,6 +434,10 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
     if (description) payload.description = description;
     if (image) payload.image = image;
     await categoriesApi.create(payload);
+    await get().fetchCategories();
+  },
+  updateCategory: async (id, changes) => {
+    await categoriesApi.update(id, changes);
     await get().fetchCategories();
   },
   deleteCategory: async (id) => {

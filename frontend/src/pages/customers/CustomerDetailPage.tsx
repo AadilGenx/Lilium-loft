@@ -11,6 +11,7 @@ import {
   MapPin,
   Edit,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import { MobileList, MobileRow, TableOnly } from '@/components/ui/mobile-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -39,6 +40,7 @@ import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
 import { STICKY_COLUMN } from '@/utils/sticky';
 import { PageLoading } from '@/components/ui/page-loading';
+import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
 import { toast } from 'sonner';
 
 export function CustomerDetailPage() {
@@ -47,6 +49,7 @@ export function CustomerDetailPage() {
   const { customers, updateCustomerAddress, loaded: customersLoaded } = useCustomerStore();
   const { orders } = useOrderStore();
 
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const customer = customers.find((c) => c.id === id);
   const customerOrders = orders.filter(
     (o) =>
@@ -161,6 +164,15 @@ export function CustomerDetailPage() {
           >
             <Edit className="h-4 w-4" />
             <span>Edit Addresses</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            className="gap-1.5 bg-white text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Delete</span>
           </Button>
         </div>
       </div>
@@ -471,6 +483,11 @@ export function CustomerDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <DeleteCustomerDialog
+        customer={deleteOpen ? customer ?? null : null}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={() => navigate('/customers')}
+      />
     </div>
   );
 }
