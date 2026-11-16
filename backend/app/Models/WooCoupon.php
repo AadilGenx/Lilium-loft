@@ -25,4 +25,35 @@ class WooCoupon extends Model
             'raw' => 'array',
         ];
     }
+
+    public const DETAIL_ATTRS = ['description', 'individual_use', 'minimum_amount', 'maximum_amount', 'exclude_sale_items'];
+
+    public function getDescriptionAttribute(): ?string
+    {
+        return $this->raw['description'] ?? null;
+    }
+
+    public function getIndividualUseAttribute(): bool
+    {
+        return (bool) ($this->raw['individual_use'] ?? false);
+    }
+
+    public function getMinimumAmountAttribute(): ?string
+    {
+        $v = $this->raw['minimum_amount'] ?? null;
+
+        return $v === '' ? null : $v;
+    }
+
+    public function getMaximumAmountAttribute(): ?string
+    {
+        $v = $this->raw['maximum_amount'] ?? null;
+
+        return $v === '' ? null : $v;
+    }
+
+    public function getExcludeSaleItemsAttribute(): bool
+    {
+        return (bool) ($this->raw['exclude_sale_items'] ?? false);
+    }
 }

@@ -34,17 +34,21 @@ import {
 } from '@/components/ui/dialog';
 import { useCustomerStore, useOrderStore } from '@/store';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { initials } from '@/utils/initials';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { customers, updateCustomer } = useCustomerStore();
+  const { customers, updateCustomerAddress } = useCustomerStore();
   const { orders } = useOrderStore();
 
   const customer = customers.find((c) => c.id === id);
   const customerOrders = orders.filter(
-    (o) => o.customerId === id || o.customerEmail.toLowerCase() === customer?.email.toLowerCase()
+    (o) =>
+      (customer && customer.wooId > 0 && o.customerId === String(customer.wooId)) ||
+      (!!customer?.email && o.customerEmail.toLowerCase() === customer.email.toLowerCase())
   );
 
   // Address edit modal state
@@ -74,25 +78,19 @@ export function CustomerDetailPage() {
     );
   }
 
-  const computedTotalSpent = customerOrders.reduce((sum, o) => sum + o.total, 0) || customer.totalSpent;
-  const computedOrdersCount = customerOrders.length || customer.totalOrders;
+  // Lifetime figures straight from WooCommerce.
+  const computedTotalSpent = customer.totalSpent;
+  const computedOrdersCount = customer.totalOrders;
   const aov = computedOrdersCount > 0 ? computedTotalSpent / computedOrdersCount : 0;
 
-  const handleSaveAddress = () => {
-    updateCustomer(customer.id, {
-      billing: billingAddress,
-      shipping: {
-        firstName: billingAddress.firstName,
-        lastName: billingAddress.lastName,
-        address1: billingAddress.address1,
-        city: billingAddress.city,
-        state: billingAddress.state,
-        postcode: billingAddress.postcode,
-        country: billingAddress.country,
-      },
-    });
-    toast.success('Customer address updated.');
-    setEditAddressOpen(false);
+  const handleSaveAddress = async () => {
+    try {
+      await updateCustomerAddress(customer.id, billingAddress);
+      toast.success('Customer address updated.');
+      setEditAddressOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const getOrderStatusBadge = (status: string) => {
@@ -130,11 +128,7 @@ export function CustomerDetailPage() {
           </Button>
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0">
-              <img
-                src={customer.avatarUrl}
-                alt={customer.firstName}
-                className="h-full w-full object-cover"
-              />
+              <span className="h-full w-full flex items-center justify-center text-xs font-semibold text-slate-600">{initials(customer.firstName, customer.lastName)}</span>
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -154,7 +148,10 @@ export function CustomerDetailPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setEditAddressOpen(true)}
+            onClick={() => {
+              setBillingAddress(customer.billing);
+              setEditAddressOpen(true);
+            }}
             className="gap-1.5 bg-white text-slate-700"
           >
             <Edit className="h-4 w-4" />
@@ -312,7 +309,10 @@ export function CustomerDetailPage() {
                 <span>Default Address</span>
               </CardTitle>
               <button
-                onClick={() => setEditAddressOpen(true)}
+                onClick={() => {
+              setBillingAddress(customer.billing);
+              setEditAddressOpen(true);
+            }}
                 className="text-xs text-red-600 hover:underline font-medium"
               >
                 Edit
@@ -327,7 +327,7 @@ export function CustomerDetailPage() {
                 {customer.billing.city || 'Springfield'}, {customer.billing.state || 'IL'}{' '}
                 {customer.billing.postcode || '62704'}
               </p>
-              <p>{customer.billing.country || 'United States'}</p>
+              <p>{customer.billing.country}</p>
             </CardContent>
           </Card>
 

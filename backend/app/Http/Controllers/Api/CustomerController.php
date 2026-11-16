@@ -45,7 +45,10 @@ class CustomerController extends Controller
                 ->orWhere('username', 'like', "%{$v}%")->orWhere('email', 'like', "%{$v}%")))
             ->orderBy($request->input('sort', 'woo_created_at'), $request->input('direction', 'desc'));
 
-        return response()->json($q->paginate((int) $request->input('per_page', 20))->withQueryString());
+        $page = $q->paginate((int) $request->input('per_page', 20))->withQueryString();
+        $page->getCollection()->each->append(WooCustomer::DETAIL_ATTRS);
+
+        return response()->json($page);
     }
 
     #[OA\Get(
@@ -63,6 +66,6 @@ class CustomerController extends Controller
     )]
     public function show(int $id): JsonResponse
     {
-        return response()->json(WooCustomer::findOrFail($id));
+        return response()->json(WooCustomer::findOrFail($id)->append(WooCustomer::DETAIL_ATTRS));
     }
 }

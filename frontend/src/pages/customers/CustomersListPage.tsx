@@ -36,11 +36,13 @@ import { useCustomerStore } from '@/store';
 import { Customer } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
+import { initials } from '@/utils/initials';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function CustomersListPage() {
   const navigate = useNavigate();
-  const { customers, addCustomer } = useCustomerStore();
+  const { customers, createCustomer } = useCustomerStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,7 +60,7 @@ export function CustomersListPage() {
     city: '',
     state: '',
     postcode: '',
-    country: 'United States',
+    country: '',
   });
 
   const filteredCustomers = useMemo(() => {
@@ -75,43 +77,32 @@ export function CustomersListPage() {
     currentPage * pageSize
   );
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName || !formData.lastName || !formData.email) {
       toast.error('First name, last name, and email are required.');
       return;
     }
 
-    const created = addCustomer({
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      username: formData.username || formData.email.split('@')[0],
-      avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80`,
-      role: 'Customer',
-      billing: {
+    try {
+      await createCustomer({
         firstName: formData.firstName,
         lastName: formData.lastName,
-        address1: formData.address1,
-        city: formData.city,
-        state: formData.state,
-        postcode: formData.postcode,
-        country: formData.country,
         email: formData.email,
+        username: formData.username || undefined,
         phone: formData.phone,
-      },
-      shipping: {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
         address1: formData.address1,
         city: formData.city,
         state: formData.state,
         postcode: formData.postcode,
         country: formData.country,
-      },
-    });
+      });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      return;
+    }
 
-    toast.success(`Customer "${created.firstName} ${created.lastName}" registered.`);
+    toast.success(`Customer "${formData.firstName} ${formData.lastName}" registered.`);
     setAddModalOpen(false);
     setFormData({
       firstName: '',
@@ -123,7 +114,7 @@ export function CustomersListPage() {
       city: '',
       state: '',
       postcode: '',
-      country: 'United States',
+      country: '',
     });
   };
 
@@ -228,11 +219,7 @@ export function CustomersListPage() {
                   >
                     <TableCell>
                       <div className="h-10 w-10 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-200">
-                        <img
-                          src={customer.avatarUrl}
-                          alt={customer.firstName}
-                          className="h-full w-full object-cover"
-                        />
+                        <span className="h-full w-full flex items-center justify-center text-xs font-semibold text-slate-600">{initials(customer.firstName, customer.lastName)}</span>
                       </div>
                     </TableCell>
                     <TableCell>

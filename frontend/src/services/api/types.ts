@@ -13,6 +13,21 @@ export interface BackendPagination<T> {
   total: number;
 }
 
+/** WooCommerce address object as the backend returns it. */
+export interface BackendAddress {
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  address_1?: string;
+  address_2?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
+}
+
 export interface BackendCategory {
   id: number;
   woo_id: number;
@@ -46,6 +61,10 @@ export interface BackendProduct {
   woo_created_at: string | null;
   woo_modified_at: string | null;
   categories?: BackendCategory[];
+  description?: string | null;
+  short_description?: string | null;
+  featured?: boolean;
+  gallery?: { id: number; src: string; alt: string }[];
 }
 
 export interface BackendOrderItem {
@@ -88,6 +107,23 @@ export interface BackendOrder {
   woo_paid_at: string | null;
   woo_completed_at: string | null;
   items?: BackendOrderItem[];
+  billing?: BackendAddress;
+  shipping?: BackendAddress;
+}
+
+export interface BackendOrderNote {
+  id: number;
+  author: string;
+  date_created: string | null;
+  note: string;
+  customer_note: boolean;
+}
+
+export interface BackendOrderRefund {
+  id: number;
+  amount: string;
+  reason: string;
+  date_created: string | null;
 }
 
 export interface BackendCustomer {
@@ -105,6 +141,8 @@ export interface BackendCustomer {
   orders_count: number;
   total_spent: string;
   woo_created_at: string | null;
+  billing?: BackendAddress;
+  shipping?: BackendAddress;
 }
 
 export interface BackendCoupon {
@@ -118,6 +156,11 @@ export interface BackendCoupon {
   usage_limit: number | null;
   free_shipping: boolean;
   expires_at: string | null;
+  description?: string | null;
+  individual_use?: boolean;
+  minimum_amount?: string | null;
+  maximum_amount?: string | null;
+  exclude_sale_items?: boolean;
 }
 
 export interface BackendDashboardSummary {
@@ -140,8 +183,12 @@ export interface BackendRevenuePoint {
 }
 
 export interface BackendTopProduct {
+  /** Local product id. */
   id: number;
+  product_woo_id: number;
   name: string;
+  sku: string | null;
+  image_url: string | null;
   total_sales: number;
   revenue: number;
 }
@@ -155,3 +202,117 @@ export interface BackendSyncLog {
   created_at: string;
 }
 
+// ----- Store configuration (read live from WooCommerce) -----
+
+/** A WooCommerce "setting" object: gateway/shipping-method options and settings-group entries. */
+export interface BackendSetting {
+  id: string;
+  label: string;
+  description?: string;
+  type: string;
+  value: string | string[] | Record<string, unknown>;
+  default?: string;
+  tip?: string;
+  options?: Record<string, string>;
+  redacted?: boolean;
+}
+
+export interface BackendSettingsGroup {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface BackendShippingMethod {
+  id: number;
+  instance_id: number;
+  title: string;
+  enabled: boolean;
+  method_id: string;
+  method_title: string;
+  settings?: Record<string, BackendSetting>;
+}
+
+export interface BackendShippingZone {
+  id: number;
+  name: string;
+  order: number;
+  locations: { code: string; type: string }[];
+  methods: BackendShippingMethod[];
+}
+
+export interface BackendPaymentGateway {
+  id: string;
+  title: string;
+  description: string;
+  order: number | string;
+  enabled: boolean;
+  method_title: string;
+  method_description: string;
+  settings?: Record<string, BackendSetting>;
+}
+
+// ----- Notifications -----
+
+export interface BackendNotification {
+  id: string;
+  type: 'new_order' | 'order_problem' | 'out_of_stock' | 'low_stock' | 'sync_failed' | 'write_failed';
+  severity: 'info' | 'warning' | 'danger';
+  title: string;
+  message: string;
+  resource: 'orders' | 'products' | null;
+  resource_id: number | null;
+  created_at: string;
+  read: boolean;
+}
+
+// ----- Reports -----
+
+export interface BackendSalesReport {
+  from: string;
+  to: string;
+  group_by: 'day' | 'week' | 'month';
+  totals: {
+    orders: number;
+    gross_sales: number;
+    discounts: number;
+    shipping: number;
+    tax: number;
+    items_sold: number;
+    net_sales: number;
+    average_order_value: number;
+  };
+  data: {
+    period: string;
+    orders: number;
+    gross_sales: number;
+    discounts: number;
+    shipping: number;
+    tax: number;
+    net_sales: number;
+  }[];
+}
+
+export interface BackendCategoryReportRow {
+  category_woo_id: number;
+  name: string;
+  orders: number;
+  units: number;
+  revenue: number;
+}
+
+export interface BackendProductReportRow {
+  product_woo_id: number;
+  name: string;
+  orders: number;
+  units: number;
+  revenue: number;
+}
+
+export interface BackendCustomerReportRow {
+  email: string;
+  name: string | null;
+  orders: number;
+  total_spent: number;
+  last_order_at: string;
+}

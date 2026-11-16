@@ -1,0 +1,239 @@
+<?php
+
+namespace App\Http\Controllers\Api\Write;
+
+use App\Http\Controllers\Controller;
+use App\Models\WooOrder;
+use App\Services\WooCommerce\UpstreamUnavailable;
+use App\Services\WooCommerce\WooClient;
+use App\Services\WooCommerce\WooErrors;
+use App\Services\WooCommerce\WooNotConfigured;
+use App\Services\WooCommerce\WooSyncService;
+use App\Services\WooCommerce\WooWriteClient;
+use App\Services\WooCommerce\WooWriter;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
+
+class OrderWriteController extends Controller
+{
+    public const STATUSES = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'];
+
+    public function __construct(
+        private WooWriter $writer,
+        private WooClient $woo,
+        private WooSyncService $sync,
+    ) {}
+
+    #[OA\Get(
+        path: '/api/v1/orders/{id}/notes',
+        operationId: 'orderNotesIndex',
+        summary: 'Notes on an order',
+        description: 'Read live from WooCommerce (not cached), oldest first. `customer_note: true` means the customer was e-mailed the note.',
+        security: [['bearerAuth' => []]],
+        tags: ['Orders'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Local order id', schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Notes', content: new OA\JsonContent(type: 'array', items: new OA\Items(properties: [
+                new OA\Property(property: 'id', type: 'integer'),
+                new OA\Property(property: 'author', type: 'string'),
+                new OA\Property(property: 'date_created', type: 'string', format: 'date-time'),
+                new OA\Property(property: 'note', type: 'string'),
+                new OA\Property(property: 'customer_note', type: 'boolean'),
+            ]))),
+            new OA\Response(response: 401, ref: '#/components/responses/Unauthenticated'),
+            new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 502, description: 'WooCommerce could not be reached', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+        ],
+    )]
+    public function notes(int $id): JsonResponse
+    {
+        $order = WooOrder::findOrFail($id);
+        $rows = $this->live("orders/{$order->woo_id}/notes", ['order' => 'asc']);
+
+        return response()->json(array_map(fn (array $n) => [
+            'id' => $n['id'],
+            'author' => $n['author'] ?? 'system',
+            'date_created' => $n['date_created_gmt'] ?? $n['date_created'] ?? null,
+            'note' => $n['note'] ?? '',
+            'customer_note' => (bool) ($n['customer_note'] ?? false),
+        ], $rows));
+    }
+
+    #[OA\Get(
+        path: '/api/v1/orders/{id}/refunds',
+        operationId: 'orderRefundsIndex',
+        summary: 'Refunds recorded on an order',
+        description: 'Read live from WooCommerce (not cached).',
+        security: [['bearerAuth' => []]],
+        tags: ['Orders'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Local order id', schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Refunds', content: new OA\JsonContent(type: 'array', items: new OA\Items(properties: [
+                new OA\Property(property: 'id', type: 'integer'),
+                new OA\Property(property: 'amount', type: 'string', example: '120.00'),
+                new OA\Property(property: 'reason', type: 'string'),
+                new OA\Property(property: 'date_created', type: 'string', format: 'date-time'),
+            ]))),
+            new OA\Response(response: 401, ref: '#/components/responses/Unauthenticated'),
+            new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 502, description: 'WooCommerce could not be reached', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+        ],
+    )]
+    public function refunds(int $id): JsonResponse
+    {
+        $order = WooOrder::findOrFail($id);
+        $rows = $this->live("orders/{$order->woo_id}/refunds");
+
+        return response()->json(array_map(fn (array $r) => [
+            'id' => $r['id'],
+            // WooCommerce reports refunds as negative totals; show the positive amount.
+            'amount' => ltrim((string) ($r['amount'] ?? $r['total'] ?? '0'), '-'),
+            'reason' => $r['reason'] ?? '',
+            'date_created' => $r['date_created_gmt'] ?? $r['date_created'] ?? null,
+        ], $rows));
+    }
+
+    #[OA\Put(
+        path: '/api/v1/orders/{id}/status',
+        operationId: 'orderStatusUpdate',
+        summary: 'Change an order\'s status',
+        description: 'CHANGES THE LIVE STORE. Needs the "orders.update" write switch. WooCommerce runs its normal side effects for the new status (stock changes, customer e-mails). Setting `refunded` here does NOT move money; use the refunds endpoint to record one.',
+        security: [['bearerAuth' => []]],
+        tags: ['Orders'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Local order id', schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['status'], properties: [
+            new OA\Property(property: 'status', type: 'string', enum: self::STATUSES),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'Updated order with items', content: new OA\JsonContent(ref: '#/components/schemas/Order')),
+            new OA\Response(response: 403, description: 'Writes are disabled or the user is not allowed to write', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+            new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 422, description: 'Validation failed', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+            new OA\Response(response: 502, description: 'WooCommerce rejected the change or could not be reached', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+        ],
+    )]
+    public function status(Request $request, int $id): JsonResponse
+    {
+        $order = WooOrder::findOrFail($id);
+        $data = $request->validate(['status' => 'required|in:'.implode(',', self::STATUSES)]);
+
+        $this->writer->run('orders', 'status', $order->woo_id, $data, ['status' => $order->status], $request->user(), $request->ip(),
+            fn (WooWriteClient $c) => $c->put("orders/{$order->woo_id}", $data));
+
+        return response()->json($this->refreshed($order));
+    }
+
+    #[OA\Post(
+        path: '/api/v1/orders/{id}/notes',
+        operationId: 'orderNotesCreate',
+        summary: 'Add a note to an order',
+        description: 'CHANGES THE LIVE STORE. Needs the "orders.note" write switch. With `customer_note: true` WooCommerce e-mails the note to the customer.',
+        security: [['bearerAuth' => []]],
+        tags: ['Orders'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Local order id', schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['note'], properties: [
+            new OA\Property(property: 'note', type: 'string'),
+            new OA\Property(property: 'customer_note', type: 'boolean', default: false),
+        ])),
+        responses: [
+            new OA\Response(response: 201, description: 'Created note'),
+            new OA\Response(response: 403, description: 'Writes are disabled or the user is not allowed to write', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+            new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 422, description: 'Validation failed', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+            new OA\Response(response: 502, description: 'WooCommerce rejected the change or could not be reached', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+        ],
+    )]
+    public function addNote(Request $request, int $id): JsonResponse
+    {
+        $order = WooOrder::findOrFail($id);
+        $data = $request->validate([
+            'note' => 'required|string|max:5000',
+            'customer_note' => 'sometimes|boolean',
+        ]);
+        $data += ['customer_note' => false];
+
+        $note = $this->writer->run('orders', 'note', $order->woo_id, $data, null, $request->user(), $request->ip(),
+            fn (WooWriteClient $c) => $c->post("orders/{$order->woo_id}/notes", $data));
+
+        return response()->json([
+            'id' => $note['id'] ?? null,
+            'author' => $note['author'] ?? 'system',
+            'date_created' => $note['date_created_gmt'] ?? $note['date_created'] ?? null,
+            'note' => $note['note'] ?? $data['note'],
+            'customer_note' => (bool) ($note['customer_note'] ?? $data['customer_note']),
+        ], 201);
+    }
+
+    #[OA\Post(
+        path: '/api/v1/orders/{id}/refunds',
+        operationId: 'orderRefundsCreate',
+        summary: 'Record a refund on an order',
+        description: 'CHANGES THE LIVE STORE. Needs the "orders.refund" write switch. This only RECORDS the refund in WooCommerce; it never asks the payment gateway to send money back (`api_refund` is always false), so the money must be returned through the gateway separately. The amount must be greater than zero and WooCommerce rejects anything above what is still refundable.',
+        security: [['bearerAuth' => []]],
+        tags: ['Orders'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Local order id', schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['amount'], properties: [
+            new OA\Property(property: 'amount', type: 'string', example: '120.00'),
+            new OA\Property(property: 'reason', type: 'string'),
+        ])),
+        responses: [
+            new OA\Response(response: 201, description: 'Created refund'),
+            new OA\Response(response: 403, description: 'Writes are disabled or the user is not allowed to write', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+            new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 422, description: 'Validation failed', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError')),
+            new OA\Response(response: 502, description: 'WooCommerce rejected the change or could not be reached', content: new OA\JsonContent(ref: '#/components/schemas/Error')),
+        ],
+    )]
+    public function addRefund(Request $request, int $id): JsonResponse
+    {
+        $order = WooOrder::findOrFail($id);
+        $data = $request->validate([
+            'amount' => 'required|numeric|gt:0|max:99999999',
+            'reason' => 'sometimes|nullable|string|max:1000',
+        ]);
+
+        if ((float) $data['amount'] > (float) $order->total) {
+            abort(422, 'The refund cannot be more than the order total.');
+        }
+
+        // api_refund is hard-wired to false: recording a refund must never move real money.
+        $payload = ['amount' => (string) $data['amount'], 'reason' => (string) ($data['reason'] ?? ''), 'api_refund' => false];
+
+        $refund = $this->writer->run('orders', 'refund', $order->woo_id, $payload, ['total' => $order->total, 'status' => $order->status], $request->user(), $request->ip(),
+            fn (WooWriteClient $c) => $c->post("orders/{$order->woo_id}/refunds", $payload));
+
+        $this->refreshed($order);
+
+        return response()->json([
+            'id' => $refund['id'] ?? null,
+            'amount' => ltrim((string) ($refund['amount'] ?? $payload['amount']), '-'),
+            'reason' => $refund['reason'] ?? $payload['reason'],
+            'date_created' => $refund['date_created_gmt'] ?? $refund['date_created'] ?? null,
+        ], 201);
+    }
+
+    /** Re-read the order from WooCommerce (it may have changed status or totals) and update the mirror. */
+    private function refreshed(WooOrder $order): WooOrder
+    {
+        try {
+            return $this->sync->storeOrder($this->woo->get("orders/{$order->woo_id}"))->load('items');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $order->refresh()->load('items');
+        }
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function live(string $endpoint, array $query = []): array
+    {
+        try {
+            return $this->woo->get($endpoint, $query);
+        } catch (RequestException|ConnectionException|WooNotConfigured $e) {
+            throw new UpstreamUnavailable(WooErrors::describe($e, "read {$endpoint}"));
+        }
+    }
+}

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
+use PHPOpenSourceSaver\JWTAuth\Exceptions\JWTException;
 
 class AuthController extends Controller
 {
@@ -57,7 +59,12 @@ class AuthController extends Controller
     )]
     public function refresh(): JsonResponse
     {
-        return $this->tokenResponse(auth('api')->refresh());
+        try {
+            return $this->tokenResponse(auth('api')->refresh());
+        } catch (JWTException) {
+            // No token, a token past the refresh window, or one that was logged out.
+            throw new AuthenticationException('Unauthenticated.');
+        }
     }
 
     #[OA\Get(

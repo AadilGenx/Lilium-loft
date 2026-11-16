@@ -1,19 +1,21 @@
 import { create } from 'zustand';
 import {
   Product,
+  ProductType,
+  ProductStatus,
+  StockStatus,
   Order,
   Customer,
   Coupon,
   ShippingZone,
   PaymentGateway,
-  Transaction,
-  SettingsState,
   OrderStatus,
   ShippingMethod,
   ProductCategory,
+  Address,
 } from '@/types';
-import { initialSettings } from '@/services/defaultSettings';
 import {
+  ApiError,
   authApi,
   productsApi,
   ordersApi,
@@ -21,172 +23,154 @@ import {
   categoriesApi,
   couponsApi,
   dashboardApi,
+  shippingApi,
+  paymentsApi,
+  settingsApi,
+  notificationsApi,
+  syncApi,
+  StoreImportResult,
   mapBackendProduct,
   mapBackendOrder,
+  mapBackendOrderNote,
+  mapBackendOrderRefund,
   mapBackendCustomer,
   mapBackendCategory,
   mapBackendCoupon,
+  mapShippingZone,
+  mapPaymentGateway,
+  mapBackendNotification,
   BackendDashboardSummary,
   BackendRevenuePoint,
   BackendTopProduct,
+  BackendSetting,
+  BackendSettingsGroup,
   getStoredToken,
 } from '@/services/api';
 
-// Helper for local storage with mock-cleanup check
-const loadFromStorage = <T>(key: string, defaultValue: T): T => {
-  try {
-    const item = localStorage.getItem(`lilium_${key}`);
-    if (!item) return defaultValue;
-    const parsed = JSON.parse(item);
-    // If cached data contains legacy mock items, clear it so API data takes precedence
-    if (
-      Array.isArray(parsed) &&
-      parsed.some(
-        (x: any) =>
-          String(x?.id || '').startsWith('prod-10') ||
-          String(x?.id || '').startsWith('ord-100') ||
-          String(x?.id || '').startsWith('cust-100') ||
-          String(x?.id || '').startsWith('cat-') ||
-          String(x?.id || '').startsWith('coup-')
-      )
-    ) {
-      localStorage.removeItem(`lilium_${key}`);
-      return defaultValue;
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Error loading from storage', e);
-    return defaultValue;
-  }
-};
+// Nothing here is cached in the browser and nothing has a built-in default:
+// every list starts empty and is filled only from what the backend returns.
+// Reads never raise toasts; they just leave the list empty (or as it was) and record `error`.
+// Writes call the backend first and refetch afterwards; they throw so the page can show a toast.
 
-const saveToStorage = <T>(key: string, value: T) => {
-  try {
-    localStorage.setItem(`lilium_${key}`, JSON.stringify(value));
-  } catch (e) {
-    console.error('Error saving to storage', e);
-  }
-};
-
-const defaultShippingZones: ShippingZone[] = [
-  {
-    id: 'zone-1',
-    name: 'India Domestic',
-    regions: ['India (All states)'],
-    methods: [
-      { id: 'm-1', title: 'Standard Delivery', type: 'flat_rate', cost: 100, enabled: true, taxStatus: 'none' },
-      { id: 'm-2', title: 'Free Shipping', type: 'free_shipping', cost: 0, enabled: true, taxStatus: 'none' },
-    ],
-  },
-];
-
-const defaultPaymentGateways: PaymentGateway[] = [
-  {
-    id: 'phonepe',
-    title: 'PhonePe Payment Solutions',
-    description: 'Accept UPI, Cards, NetBanking via PhonePe',
-    enabled: true,
-    methodTitle: 'PhonePe',
-    methodDescription: 'Pay with UPI, PhonePe or Cards',
-  },
-  {
-    id: 'razorpay',
-    title: 'Razorpay',
-    description: 'Credit Cards, Debit Cards, UPI, NetBanking',
-    enabled: true,
-    methodTitle: 'Razorpay',
-    methodDescription: 'Cards, NetBanking, Wallets & UPI',
-  },
-  {
-    id: 'cod',
-    title: 'Cash on Delivery',
-    description: 'Pay with cash upon delivery',
-    enabled: true,
-    methodTitle: 'Cash on Delivery',
-    methodDescription: 'Pay with cash upon delivery',
-  },
-];
+const readError = (err: unknown, fallback: string) => (err instanceof ApiError && err.message ? err.message : fallback);
 
 // ================= PRODUCT STORE =================
+/** What the product form collects. */
+export interface ProductInput {
+  name: string;
+  slug?: string;
+  sku: string;
+  type: ProductType;
+  status: ProductStatus;
+  regularPrice: number;
+  salePrice?: number;
+  manageStock: boolean;
+  stockQuantity: number;
+  stockStatus: StockStatus;
+  categories: string[];
+  shortDescription: string;
+  description: string;
+  images: string[];
+}
+
+/** Builds the request body. On update only the fields that changed are sent. */
+function buildProductPayload(next: ProductInput, prev: Product | null, categories: ProductCategory[]) {
+  const payload: Record<string, unknown> = {};
+  const changed = <T,>(a: T, b: T | undefined) => !prev || a !== b;
+
+  if (changed(next.name, prev?.name)) payload.name = next.name;
+  if (next.slug && changed(next.slug, prev?.slug)) payload.slug = next.slug;
+  if (changed(next.sku, prev?.sku)) payload.sku = next.sku;
+  if (changed(next.status, prev?.status)) payload.status = next.status;
+  if (changed(next.shortDescription, prev?.shortDescription)) payload.short_description = next.shortDescription;
+  if (changed(next.description, prev?.description)) payload.description = next.description;
+
+  // Variable products keep prices on their variations, which this API does not edit.
+  if (next.type === 'simple') {
+    if (changed(next.regularPrice, prev?.regularPrice)) payload.regular_price = String(next.regularPrice);
+    if (changed(next.salePrice, prev?.salePrice) && (prev || next.salePrice !== undefined)) {
+      payload.sale_price = next.salePrice === undefined ? null : String(next.salePrice);
+    }
+  }
+
+  if (changed(next.manageStock, prev?.manageStock)) payload.manage_stock = next.manageStock;
+  if (next.manageStock && changed(next.stockQuantity, prev?.stockQuantity)) payload.stock_quantity = next.stockQuantity;
+  if (changed(next.stockStatus, prev?.stockStatus)) payload.stock_status = next.stockStatus;
+
+  const prevCats = [...(prev?.categories ?? [])].sort().join('|');
+  if (!prev || [...next.categories].sort().join('|') !== prevCats) {
+    payload.categories = next.categories
+      .map((name) => categories.find((c) => c.name === name)?.wooId)
+      .filter((id): id is number => typeof id === 'number');
+  }
+
+  const prevImages = (prev?.images ?? []).map((i) => i.src).join('|');
+  if (!prev ? next.images.length > 0 : next.images.join('|') !== prevImages) {
+    payload.images = next.images;
+  }
+
+  return payload;
+}
+
 interface ProductStore {
   products: Product[];
   isLoading: boolean;
   error: string | null;
   fetchProducts: () => Promise<void>;
-  setProducts: (products: Product[]) => void;
-  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
-  updateProduct: (id: string, updates: Partial<Product>) => void;
-  deleteProduct: (id: string) => void;
-  adjustStock: (id: string, quantity: number, type: 'set' | 'add' | 'subtract') => void;
+  /** Returns the new product's id (null if the backend could not give one yet). */
+  createProduct: (input: ProductInput) => Promise<string | null>;
+  updateProduct: (id: string, input: ProductInput) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  adjustStock: (id: string, quantity: number, type: 'set' | 'add' | 'subtract') => Promise<void>;
 }
 
 export const useProductStore = create<ProductStore>((set, get) => ({
-  products: loadFromStorage<Product[]>('products', []),
+  products: [],
   isLoading: false,
   error: null,
-  setProducts: (products) => {
-    set({ products });
-    saveToStorage('products', products);
-  },
   fetchProducts: async () => {
     set({ isLoading: true, error: null });
     try {
       const res = await productsApi.list({ per_page: 100 });
-      if (res.data) {
-        const mapped = res.data.map(mapBackendProduct);
-        set({ products: mapped, isLoading: false });
-        saveToStorage('products', mapped);
-      } else {
-        set({ isLoading: false });
-      }
-    } catch (err: any) {
-      console.warn('Failed to fetch products from backend API:', err);
-      set({ isLoading: false, error: err?.message || 'Failed to fetch products' });
+      set({ products: (res.data ?? []).map(mapBackendProduct), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch products:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch products') });
     }
   },
-  addProduct: (newProd) => {
-    const now = new Date().toISOString();
-    const product: Product = {
-      ...newProd,
-      id: `prod-${Date.now()}`,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const updated = [product, ...get().products];
-    set({ products: updated });
-    saveToStorage('products', updated);
-    return product;
+  createProduct: async (input) => {
+    const payload = buildProductPayload(input, null, useCategoryStore.getState().categories);
+    const created = await productsApi.create(payload);
+    await get().fetchProducts();
+    return created?.id ? String(created.id) : null;
   },
-  updateProduct: (id, updates) => {
-    const updated = get().products.map((p) =>
-      p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-    );
-    set({ products: updated });
-    saveToStorage('products', updated);
+  updateProduct: async (id, input) => {
+    const prev = get().products.find((p) => p.id === id) ?? null;
+    const payload = buildProductPayload(input, prev, useCategoryStore.getState().categories);
+    if (Object.keys(payload).length > 0) {
+      await productsApi.update(id, payload);
+    }
+    await get().fetchProducts();
   },
-  deleteProduct: (id) => {
-    const updated = get().products.filter((p) => p.id !== id);
-    set({ products: updated });
-    saveToStorage('products', updated);
+  deleteProduct: async (id) => {
+    await productsApi.remove(id);
+    await get().fetchProducts();
   },
-  adjustStock: (id, quantity, type) => {
-    const updated = get().products.map((p) => {
-      if (p.id !== id) return p;
-      let newQty = p.stockQuantity;
-      if (type === 'set') newQty = quantity;
-      else if (type === 'add') newQty += quantity;
-      else if (type === 'subtract') newQty = Math.max(0, newQty - quantity);
+  adjustStock: async (id, quantity, type) => {
+    const product = get().products.find((p) => p.id === id);
+    if (!product) throw new Error('Product not found.');
 
-      const stockStatus = newQty > 0 ? 'instock' : 'outofstock';
-      return {
-        ...p,
-        stockQuantity: newQty,
-        stockStatus: stockStatus as Product['stockStatus'],
-        updatedAt: new Date().toISOString(),
-      };
+    let next = product.stockQuantity;
+    if (type === 'set') next = quantity;
+    else if (type === 'add') next += quantity;
+    else next = Math.max(0, next - quantity);
+
+    await productsApi.update(id, {
+      manage_stock: true,
+      stock_quantity: next,
+      stock_status: next > 0 ? 'instock' : 'outofstock',
     });
-    set({ products: updated });
-    saveToStorage('products', updated);
+    await get().fetchProducts();
   },
 }));
 
@@ -196,189 +180,154 @@ interface OrderStore {
   isLoading: boolean;
   error: string | null;
   fetchOrders: () => Promise<void>;
-  setOrders: (orders: Order[]) => void;
-  updateOrderStatus: (id: string, status: OrderStatus) => void;
-  addOrderNote: (orderId: string, content: string, isCustomerNote: boolean) => void;
-  refundOrder: (orderId: string, amount: number, reason: string) => void;
+  /** Loads the notes and refunds recorded in WooCommerce for one order. */
+  loadOrderDetails: (id: string) => Promise<void>;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  addOrderNote: (orderId: string, content: string, isCustomerNote: boolean) => Promise<void>;
+  refundOrder: (orderId: string, amount: number, reason: string) => Promise<void>;
 }
 
-export const useOrderStore = create<OrderStore>((set, get) => ({
-  orders: loadFromStorage<Order[]>('orders', []),
-  isLoading: false,
-  error: null,
-  setOrders: (orders) => {
-    set({ orders });
-    saveToStorage('orders', orders);
-  },
-  fetchOrders: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const res = await ordersApi.list({ per_page: 100, with_items: 1 });
-      if (res.data) {
-        const mapped = res.data.map(mapBackendOrder);
-        set({ orders: mapped, isLoading: false });
-        saveToStorage('orders', mapped);
+export const useOrderStore = create<OrderStore>((set, get) => {
+  const replace = (order: Order) =>
+    set({
+      orders: get().orders.map((o) =>
+        o.id === order.id ? { ...order, notes: o.notes, refunds: o.refunds } : o
+      ),
+    });
 
-        // Derive live payment transactions from real orders
-        const mappedTransactions: Transaction[] = mapped.map((o) => ({
-          id: `tx-${o.id}`,
-          orderId: o.id,
-          orderNumber: o.orderNumber,
-          customerName: o.customerName,
-          amount: o.total,
-          currency: 'INR',
-          status:
-            o.status === 'completed'
-              ? 'completed'
-              : o.status === 'refunded'
-              ? 'refunded'
-              : 'pending',
-          paymentMethod: o.paymentMethodTitle || o.paymentMethod,
-          date: o.dateCreated,
-          transactionReference: o.transactionId || `TX-${o.orderNumber}`,
-        }));
-        usePaymentStore.setState({ transactions: mappedTransactions });
-        saveToStorage('transactions', mappedTransactions);
-      } else {
-        set({ isLoading: false });
+  return {
+    orders: [],
+    isLoading: false,
+    error: null,
+    fetchOrders: async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const res = await ordersApi.list({ per_page: 100, with_items: 1 });
+        set({ orders: (res.data ?? []).map(mapBackendOrder), isLoading: false });
+      } catch (err) {
+        console.warn('Failed to fetch orders:', err);
+        set({ isLoading: false, error: readError(err, 'Failed to fetch orders') });
       }
-    } catch (err: any) {
-      console.warn('Failed to fetch orders from backend API:', err);
-      set({ isLoading: false, error: err?.message || 'Failed to fetch orders' });
-    }
-  },
-  updateOrderStatus: (id, status) => {
-    const updated = get().orders.map((o) => {
-      if (o.id !== id) return o;
-      const newNotes = [
-        ...o.notes,
-        {
-          id: `note-${Date.now()}`,
-          content: `Order status updated to ${status}.`,
-          date: new Date().toISOString(),
-          author: 'Admin',
-          isCustomerNote: false,
-        },
-      ];
-      return { ...o, status, notes: newNotes };
-    });
-    set({ orders: updated });
-    saveToStorage('orders', updated);
-  },
-  addOrderNote: (orderId, content, isCustomerNote) => {
-    const updated = get().orders.map((o) => {
-      if (o.id !== orderId) return o;
-      return {
-        ...o,
-        notes: [
-          ...o.notes,
-          {
-            id: `note-${Date.now()}`,
-            content,
-            date: new Date().toISOString(),
-            author: isCustomerNote ? 'Customer' : 'Admin',
-            isCustomerNote,
-          },
-        ],
-      };
-    });
-    set({ orders: updated });
-    saveToStorage('orders', updated);
-  },
-  refundOrder: (orderId, amount, reason) => {
-    const updated = get().orders.map((o) => {
-      if (o.id !== orderId) return o;
-      const newRefunds = [
-        ...o.refunds,
-        {
-          id: `ref-${Date.now()}`,
-          amount,
-          reason,
-          date: new Date().toISOString(),
-        },
-      ];
-      const totalRefunded = newRefunds.reduce((sum, r) => sum + r.amount, 0);
-      const isFullRefund = totalRefunded >= o.total;
-
-      return {
-        ...o,
-        status: isFullRefund ? ('refunded' as OrderStatus) : o.status,
-        refunds: newRefunds,
-        notes: [
-          ...o.notes,
-          {
-            id: `note-${Date.now()}`,
-            content: `Processed refund of ₹${amount.toFixed(2)}. Reason: ${reason}`,
-            date: new Date().toISOString(),
-            author: 'Admin',
-            isCustomerNote: false,
-          },
-        ],
-      };
-    });
-    set({ orders: updated });
-    saveToStorage('orders', updated);
-  },
-}));
+    },
+    loadOrderDetails: async (id) => {
+      try {
+        const [notes, refunds] = await Promise.all([ordersApi.notes(id), ordersApi.refunds(id)]);
+        set({
+          orders: get().orders.map((o) => {
+            if (o.id !== id) return o;
+            const customerCheckoutNote = o.notes.filter((n) => n.id === 'customer-note');
+            return {
+              ...o,
+              notes: [...customerCheckoutNote, ...notes.map(mapBackendOrderNote)],
+              refunds: refunds.map(mapBackendOrderRefund),
+            };
+          }),
+        });
+      } catch (err) {
+        console.warn('Failed to load order notes/refunds:', err);
+      }
+    },
+    updateOrderStatus: async (id, status) => {
+      const updated = await ordersApi.setStatus(id, status);
+      replace(mapBackendOrder(updated));
+      await get().loadOrderDetails(id);
+    },
+    addOrderNote: async (orderId, content, isCustomerNote) => {
+      await ordersApi.addNote(orderId, content, isCustomerNote);
+      await get().loadOrderDetails(orderId);
+    },
+    refundOrder: async (orderId, amount, reason) => {
+      await ordersApi.addRefund(orderId, amount, reason);
+      try {
+        replace(mapBackendOrder(await ordersApi.get(orderId)));
+      } catch (err) {
+        console.warn('Failed to refresh order after refund:', err);
+      }
+      await get().loadOrderDetails(orderId);
+    },
+  };
+});
 
 // ================= CUSTOMER STORE =================
+/** What the customer forms collect. */
+export interface CustomerInput {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  username?: string;
+  phone?: string;
+  address1?: string;
+  city?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+}
+
+const customerPayload = (c: CustomerInput): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {
+    first_name: c.firstName,
+    last_name: c.lastName,
+  };
+  if (c.email) payload.email = c.email;
+  if (c.username) payload.username = c.username;
+  if (c.phone !== undefined) payload.phone = c.phone;
+  if (c.address1 !== undefined) payload.address_1 = c.address1;
+  if (c.city !== undefined) payload.city = c.city;
+  if (c.state !== undefined) payload.state = c.state;
+  if (c.postcode !== undefined) payload.postcode = c.postcode;
+  // The API wants a 2-letter country code; leave it out rather than send free text.
+  if (c.country && /^[A-Za-z]{2}$/.test(c.country)) payload.country = c.country.toUpperCase();
+  return payload;
+};
+
 interface CustomerStore {
   customers: Customer[];
   isLoading: boolean;
   error: string | null;
   fetchCustomers: () => Promise<void>;
-  setCustomers: (customers: Customer[]) => void;
-  addCustomer: (customer: Omit<Customer, 'id' | 'registeredDate' | 'totalOrders' | 'totalSpent'>) => Customer;
-  updateCustomer: (id: string, updates: Partial<Customer>) => void;
-  deleteCustomer: (id: string) => void;
+  createCustomer: (input: CustomerInput) => Promise<string | null>;
+  updateCustomerAddress: (id: string, address: Address) => Promise<void>;
+  deleteCustomer: (id: string) => Promise<void>;
 }
 
 export const useCustomerStore = create<CustomerStore>((set, get) => ({
-  customers: loadFromStorage<Customer[]>('customers', []),
+  customers: [],
   isLoading: false,
   error: null,
-  setCustomers: (customers) => {
-    set({ customers });
-    saveToStorage('customers', customers);
-  },
   fetchCustomers: async () => {
     set({ isLoading: true, error: null });
     try {
       const res = await customersApi.list({ per_page: 100 });
-      if (res.data) {
-        const mapped = res.data.map(mapBackendCustomer);
-        set({ customers: mapped, isLoading: false });
-        saveToStorage('customers', mapped);
-      } else {
-        set({ isLoading: false });
-      }
-    } catch (err: any) {
-      console.warn('Failed to fetch customers from backend API:', err);
-      set({ isLoading: false, error: err?.message || 'Failed to fetch customers' });
+      set({ customers: (res.data ?? []).map(mapBackendCustomer), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch customers:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch customers') });
     }
   },
-  addCustomer: (newCust) => {
-    const cust: Customer = {
-      ...newCust,
-      id: `cust-${Date.now()}`,
-      registeredDate: new Date().toISOString(),
-      totalOrders: 0,
-      totalSpent: 0,
-    };
-    const updated = [cust, ...get().customers];
-    set({ customers: updated });
-    saveToStorage('customers', updated);
-    return cust;
+  createCustomer: async (input) => {
+    const created = await customersApi.create(customerPayload(input));
+    await get().fetchCustomers();
+    return created?.id ? String(created.id) : null;
   },
-  updateCustomer: (id, updates) => {
-    const updated = get().customers.map((c) => (c.id === id ? { ...c, ...updates } : c));
-    set({ customers: updated });
-    saveToStorage('customers', updated);
+  updateCustomerAddress: async (id, address) => {
+    await customersApi.update(
+      id,
+      customerPayload({
+        firstName: address.firstName,
+        lastName: address.lastName,
+        phone: address.phone ?? '',
+        address1: address.address1,
+        city: address.city,
+        state: address.state,
+        postcode: address.postcode,
+        country: address.country,
+      })
+    );
+    await get().fetchCustomers();
   },
-  deleteCustomer: (id) => {
-    const updated = get().customers.filter((c) => c.id !== id);
-    set({ customers: updated });
-    saveToStorage('customers', updated);
+  deleteCustomer: async (id) => {
+    await customersApi.remove(id);
+    await get().fetchCustomers();
   },
 }));
 
@@ -388,187 +337,243 @@ interface CategoryStore {
   isLoading: boolean;
   error: string | null;
   fetchCategories: () => Promise<void>;
-  setCategories: (categories: ProductCategory[]) => void;
-  addCategory: (category: ProductCategory) => void;
+  createCategory: (input: { name: string; slug?: string; description?: string; image?: string }) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 }
 
 export const useCategoryStore = create<CategoryStore>((set, get) => ({
-  categories: loadFromStorage<ProductCategory[]>('categories', []),
+  categories: [],
   isLoading: false,
   error: null,
-  setCategories: (categories) => {
-    set({ categories });
-    saveToStorage('categories', categories);
-  },
   fetchCategories: async () => {
     set({ isLoading: true, error: null });
     try {
       const res = await categoriesApi.list(undefined, 100);
-      const rawList = Array.isArray(res)
-        ? res
-        : res && Array.isArray((res as any).data)
-        ? (res as any).data
-        : [];
-      const mapped = rawList.map(mapBackendCategory);
-      set({ categories: mapped, isLoading: false });
-      saveToStorage('categories', mapped);
-    } catch (err: any) {
-      console.warn('Failed to fetch categories from backend API:', err);
-      set({ isLoading: false, error: err?.message || 'Failed to fetch categories' });
+      set({ categories: (res.data ?? []).map(mapBackendCategory), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch categories:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch categories') });
     }
   },
-  addCategory: (category) => {
-    const updated = [category, ...get().categories];
-    set({ categories: updated });
-    saveToStorage('categories', updated);
+  createCategory: async ({ name, slug, description, image }) => {
+    const payload: Record<string, unknown> = { name };
+    if (slug) payload.slug = slug;
+    if (description) payload.description = description;
+    if (image) payload.image = image;
+    await categoriesApi.create(payload);
+    await get().fetchCategories();
+  },
+  deleteCategory: async (id) => {
+    await categoriesApi.remove(id);
+    await get().fetchCategories();
   },
 }));
 
 // ================= COUPON STORE =================
+/** What the coupon form collects. */
+export interface CouponInput {
+  code: string;
+  discountType: Coupon['discountType'];
+  amount: number;
+  description: string;
+  expiryDate?: string;
+  usageLimit?: number;
+  individualUse: boolean;
+  minimumAmount?: number;
+  maximumAmount?: number;
+  excludeSaleItems: boolean;
+}
+
+const couponPayload = (c: CouponInput): Record<string, unknown> => ({
+  code: c.code,
+  discount_type: c.discountType,
+  amount: String(c.amount),
+  description: c.description,
+  date_expires: c.expiryDate ? c.expiryDate : null,
+  usage_limit: c.usageLimit ? c.usageLimit : null,
+  individual_use: c.individualUse,
+  minimum_amount: c.minimumAmount ? String(c.minimumAmount) : null,
+  maximum_amount: c.maximumAmount ? String(c.maximumAmount) : null,
+  exclude_sale_items: c.excludeSaleItems,
+});
+
 interface CouponStore {
   coupons: Coupon[];
   isLoading: boolean;
   error: string | null;
   fetchCoupons: () => Promise<void>;
-  setCoupons: (coupons: Coupon[]) => void;
-  addCoupon: (coupon: Omit<Coupon, 'id' | 'usageCount' | 'status'>) => void;
-  updateCoupon: (id: string, updates: Partial<Coupon>) => void;
-  deleteCoupon: (id: string) => void;
+  createCoupon: (input: CouponInput) => Promise<void>;
+  updateCoupon: (id: string, input: CouponInput) => Promise<void>;
+  deleteCoupon: (id: string) => Promise<void>;
 }
 
 export const useCouponStore = create<CouponStore>((set, get) => ({
-  coupons: loadFromStorage<Coupon[]>('coupons', []),
+  coupons: [],
   isLoading: false,
   error: null,
-  setCoupons: (coupons) => {
-    set({ coupons });
-    saveToStorage('coupons', coupons);
-  },
   fetchCoupons: async () => {
     set({ isLoading: true, error: null });
     try {
       const res = await couponsApi.list(undefined, 100);
-      const rawList = Array.isArray(res)
-        ? res
-        : res && Array.isArray((res as any).data)
-        ? (res as any).data
-        : [];
-      const mapped = rawList.map(mapBackendCoupon);
-      set({ coupons: mapped, isLoading: false });
-      saveToStorage('coupons', mapped);
-    } catch (err: any) {
-      console.warn('Failed to fetch coupons from backend API:', err);
-      set({ isLoading: false, error: err?.message || 'Failed to fetch coupons' });
+      set({ coupons: (res.data ?? []).map(mapBackendCoupon), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch coupons:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch coupons') });
     }
   },
-  addCoupon: (newCoup) => {
-    const coupon: Coupon = {
-      ...newCoup,
-      id: `coup-${Date.now()}`,
-      usageCount: 0,
-      status: 'active',
-    };
-    const updated = [coupon, ...get().coupons];
-    set({ coupons: updated });
-    saveToStorage('coupons', updated);
+  createCoupon: async (input) => {
+    // The form has no draft option, so a coupon created here is live, as before.
+    await couponsApi.create({ ...couponPayload(input), status: 'publish' });
+    await get().fetchCoupons();
   },
-  updateCoupon: (id, updates) => {
-    const updated = get().coupons.map((c) => (c.id === id ? { ...c, ...updates } : c));
-    set({ coupons: updated });
-    saveToStorage('coupons', updated);
+  updateCoupon: async (id, input) => {
+    await couponsApi.update(id, couponPayload(input));
+    await get().fetchCoupons();
   },
-  deleteCoupon: (id) => {
-    const updated = get().coupons.filter((c) => c.id !== id);
-    set({ coupons: updated });
-    saveToStorage('coupons', updated);
+  deleteCoupon: async (id) => {
+    await couponsApi.remove(id);
+    await get().fetchCoupons();
   },
 }));
 
 // ================= SHIPPING & PAYMENT STORES =================
-interface ShippingStore {
-  shippingZones: ShippingZone[];
-  updateShippingMethod: (zoneId: string, methodId: string, updates: Partial<ShippingMethod>) => void;
-  addShippingMethod: (zoneId: string, method: Omit<ShippingMethod, 'id'>) => void;
-  deleteShippingMethod: (zoneId: string, methodId: string) => void;
+export interface ShippingMethodInput {
+  type: string;
+  title: string;
+  cost: number;
+  enabled: boolean;
+  taxStatus: ShippingMethod['taxStatus'];
 }
 
+interface ShippingStore {
+  shippingZones: ShippingZone[];
+  isLoading: boolean;
+  error: string | null;
+  fetchShipping: () => Promise<void>;
+  addShippingMethod: (zoneId: string, method: ShippingMethodInput) => Promise<void>;
+  updateShippingMethod: (
+    zoneId: string,
+    methodId: string,
+    updates: Partial<Pick<ShippingMethodInput, 'title' | 'cost' | 'enabled' | 'taxStatus'>>
+  ) => Promise<void>;
+  deleteShippingMethod: (zoneId: string, methodId: string) => Promise<void>;
+}
+
+const shippingMethodPayload = (m: Partial<ShippingMethodInput>): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+  if (m.title !== undefined) payload.title = m.title;
+  if (m.taxStatus !== undefined) payload.tax_status = m.taxStatus;
+  if (m.enabled !== undefined) payload.enabled = m.enabled;
+  if (m.cost !== undefined) payload.cost = m.cost;
+  return payload;
+};
+
 export const useShippingStore = create<ShippingStore>((set, get) => ({
-  shippingZones: loadFromStorage<ShippingZone[]>('shipping_zones', defaultShippingZones),
-  updateShippingMethod: (zoneId, methodId, updates) => {
-    const updated = get().shippingZones.map((zone) => {
-      if (zone.id !== zoneId) return zone;
-      return {
-        ...zone,
-        methods: zone.methods.map((m) => (m.id === methodId ? { ...m, ...updates } : m)),
-      };
-    });
-    set({ shippingZones: updated });
-    saveToStorage('shipping_zones', updated);
+  shippingZones: [],
+  isLoading: false,
+  error: null,
+  fetchShipping: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const zones = await shippingApi.zones();
+      set({ shippingZones: zones.map(mapShippingZone), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch shipping zones:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch shipping zones') });
+    }
   },
-  addShippingMethod: (zoneId, method) => {
-    const updated = get().shippingZones.map((zone) => {
-      if (zone.id !== zoneId) return zone;
-      return {
-        ...zone,
-        methods: [...zone.methods, { ...method, id: `m-${Date.now()}` }],
-      };
-    });
-    set({ shippingZones: updated });
-    saveToStorage('shipping_zones', updated);
+  addShippingMethod: async (zoneId, method) => {
+    // Only flat-rate methods have a cost field; free shipping and pickup do not.
+    const body = shippingMethodPayload({ ...method, cost: method.type === 'flat_rate' ? method.cost : undefined });
+    await shippingApi.addMethod(zoneId, { method_id: method.type, ...body });
+    await get().fetchShipping();
   },
-  deleteShippingMethod: (zoneId, methodId) => {
-    const updated = get().shippingZones.map((zone) => {
-      if (zone.id !== zoneId) return zone;
-      return {
-        ...zone,
-        methods: zone.methods.filter((m) => m.id !== methodId),
-      };
-    });
-    set({ shippingZones: updated });
-    saveToStorage('shipping_zones', updated);
+  updateShippingMethod: async (zoneId, methodId, updates) => {
+    await shippingApi.updateMethod(zoneId, methodId, shippingMethodPayload(updates));
+    await get().fetchShipping();
+  },
+  deleteShippingMethod: async (zoneId, methodId) => {
+    await shippingApi.removeMethod(zoneId, methodId);
+    await get().fetchShipping();
   },
 }));
 
 interface PaymentStore {
   gateways: PaymentGateway[];
-  transactions: Transaction[];
-  toggleGateway: (id: string, enabled: boolean) => void;
-  updateGateway: (id: string, updates: Partial<PaymentGateway>) => void;
+  isLoading: boolean;
+  error: string | null;
+  fetchGateways: () => Promise<void>;
+  toggleGateway: (id: string, enabled: boolean) => Promise<void>;
+  updateGateway: (id: string, updates: { title: string; description: string; instructions?: string }) => Promise<void>;
 }
 
 export const usePaymentStore = create<PaymentStore>((set, get) => ({
-  gateways: loadFromStorage<PaymentGateway[]>('payment_gateways', defaultPaymentGateways),
-  transactions: loadFromStorage<Transaction[]>('transactions', []),
-  toggleGateway: (id, enabled) => {
-    const updated = get().gateways.map((g) => (g.id === id ? { ...g, enabled } : g));
-    set({ gateways: updated });
-    saveToStorage('payment_gateways', updated);
+  gateways: [],
+  isLoading: false,
+  error: null,
+  fetchGateways: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const gateways = await paymentsApi.list();
+      set({ gateways: gateways.map(mapPaymentGateway), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch payment gateways:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch payment gateways') });
+    }
   },
-  updateGateway: (id, updates) => {
-    const updated = get().gateways.map((g) => (g.id === id ? { ...g, ...updates } : g));
-    set({ gateways: updated });
-    saveToStorage('payment_gateways', updated);
+  toggleGateway: async (id, enabled) => {
+    await paymentsApi.update(id, { enabled });
+    await get().fetchGateways();
+  },
+  updateGateway: async (id, updates) => {
+    const payload: Record<string, unknown> = { title: updates.title, description: updates.description };
+    if (updates.instructions !== undefined) payload.instructions = updates.instructions;
+    await paymentsApi.update(id, payload);
+    await get().fetchGateways();
   },
 }));
 
-// ================= SETTINGS & UI STORES =================
+// ================= SETTINGS STORE =================
 interface SettingsStore {
-  settings: SettingsState;
-  updateSettings: <K extends keyof SettingsState>(section: K, updates: Partial<SettingsState[K]>) => void;
+  groups: BackendSettingsGroup[];
+  /** Every setting of each group that has been opened, as WooCommerce returned it. */
+  settings: Record<string, BackendSetting[]>;
+  isLoading: boolean;
+  error: string | null;
+  fetchGroups: () => Promise<void>;
+  fetchGroup: (id: string) => Promise<void>;
+  saveGroup: (id: string, changes: Record<string, string | boolean | string[]>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
-  settings: loadFromStorage<SettingsState>('settings', initialSettings),
-  updateSettings: (section, updates) => {
-    const updated = {
-      ...get().settings,
-      [section]: { ...get().settings[section], ...updates },
-    };
-    set({ settings: updated });
-    saveToStorage('settings', updated);
+  groups: [],
+  settings: {},
+  isLoading: false,
+  error: null,
+  fetchGroups: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      set({ groups: await settingsApi.groups(), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch settings groups:', err);
+      set({ isLoading: false, error: readError(err, 'Failed to fetch settings') });
+    }
+  },
+  fetchGroup: async (id) => {
+    try {
+      const rows = await settingsApi.group(id);
+      set({ settings: { ...get().settings, [id]: rows } });
+    } catch (err) {
+      console.warn(`Failed to fetch settings group ${id}:`, err);
+    }
+  },
+  saveGroup: async (id, changes) => {
+    await settingsApi.update(id, changes);
+    await get().fetchGroup(id);
   },
 }));
 
+// ================= UI STORE =================
 export interface NotificationItem {
   id: string;
   title: string;
@@ -588,28 +593,43 @@ interface UIStore {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setMobileMenuOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
-  markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
+  fetchNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
 }
 
 export const useUIStore = create<UIStore>((set, get) => ({
   sidebarCollapsed: false,
   mobileMenuOpen: false,
   searchOpen: false,
-  notifications: loadFromStorage<NotificationItem[]>('notifications', []),
+  notifications: [],
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
   setSearchOpen: (open) => set({ searchOpen: open }),
-  markNotificationRead: (id) => {
-    const updated = get().notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
-    set({ notifications: updated });
-    saveToStorage('notifications', updated);
+  fetchNotifications: async () => {
+    try {
+      const res = await notificationsApi.list();
+      set({ notifications: res.data.map(mapBackendNotification) });
+    } catch (err) {
+      console.warn('Failed to fetch notifications:', err);
+    }
   },
-  markAllNotificationsRead: () => {
-    const updated = get().notifications.map((n) => ({ ...n, read: true }));
-    set({ notifications: updated });
-    saveToStorage('notifications', updated);
+  markNotificationRead: async (id) => {
+    set({ notifications: get().notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) });
+    try {
+      await notificationsApi.markRead([id]);
+    } catch {
+      await get().fetchNotifications();
+    }
+  },
+  markAllNotificationsRead: async () => {
+    set({ notifications: get().notifications.map((n) => ({ ...n, read: true })) });
+    try {
+      await notificationsApi.markAllRead();
+    } catch {
+      await get().fetchNotifications();
+    }
   },
 }));
 
@@ -624,13 +644,28 @@ export interface BackendSyncState {
   topProducts: BackendTopProduct[];
   ordersByStatus: Record<string, number>;
   syncAll: () => Promise<boolean>;
+  /** Pulls everything from WooCommerce into the backend database, then reloads every screen from it. */
+  importFromStore: () => Promise<StoreImportResult>;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
 }
 
+/** Empty every store, so nothing from a previous session can show up. */
+const clearAllData = () => {
+  useProductStore.setState({ products: [], error: null });
+  useOrderStore.setState({ orders: [], error: null });
+  useCustomerStore.setState({ customers: [], error: null });
+  useCategoryStore.setState({ categories: [], error: null });
+  useCouponStore.setState({ coupons: [], error: null });
+  useShippingStore.setState({ shippingZones: [], error: null });
+  usePaymentStore.setState({ gateways: [], error: null });
+  useSettingsStore.setState({ groups: [], settings: {}, error: null });
+  useUIStore.setState({ notifications: [] });
+};
+
 export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
   status: 'idle',
-  lastSynced: localStorage.getItem('lilium_last_synced'),
+  lastSynced: null,
   errorMessage: null,
   currentUser: null,
   summary: null,
@@ -646,8 +681,8 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
       set({ currentUser: user });
       await get().syncAll();
       return true;
-    } catch (err: any) {
-      set({ status: 'error', errorMessage: err?.message || 'Login failed' });
+    } catch (err) {
+      set({ status: 'error', errorMessage: readError(err, 'Login failed') });
       return false;
     }
   },
@@ -656,70 +691,88 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
     try {
       await authApi.logout();
     } catch {
-      // ignore
+      // the token is cleared either way
     }
-    set({ currentUser: null, status: 'offline' });
+    clearAllData();
+    set({
+      currentUser: null,
+      status: 'offline',
+      summary: null,
+      revenueHistory: [],
+      topProducts: [],
+      ordersByStatus: {},
+      lastSynced: null,
+    });
+  },
+
+  importFromStore: async () => {
+    set({ status: 'syncing', errorMessage: null });
+    try {
+      const result = await syncApi.run();
+      await get().syncAll();
+      return result;
+    } catch (err) {
+      set({
+        status: get().currentUser ? 'connected' : 'offline',
+        errorMessage: readError(err, 'Import from WooCommerce failed'),
+      });
+      throw err;
+    }
   },
 
   syncAll: async () => {
     set({ status: 'syncing', errorMessage: null });
     try {
-      // 1. Verify token exists
       if (!getStoredToken()) {
         set({ status: 'offline' });
         return false;
       }
 
-      // 2. Fetch user if not in store
       if (!get().currentUser) {
         try {
-          const user = await authApi.me();
-          set({ currentUser: user });
-        } catch {
-          // Token expired or invalid
-          authApi.logout();
-          set({ currentUser: null, status: 'offline' });
+          set({ currentUser: await authApi.me() });
+        } catch (err) {
+          // Only an expired or invalid token ends the session; a network error must not log anyone out.
+          if (err instanceof ApiError && err.status === 401) {
+            authApi.logout().catch(() => undefined);
+            clearAllData();
+            set({ currentUser: null, status: 'offline' });
+          } else {
+            set({ status: 'offline', errorMessage: readError(err, 'Could not connect to backend API') });
+          }
           return false;
         }
       }
 
-      // 3. Fetch Dashboard metrics
-      try {
-        const [sum, rev, obs, top] = await Promise.all([
+      const [dash, ...lists] = await Promise.allSettled([
+        Promise.all([
           dashboardApi.getSummary(30),
           dashboardApi.getRevenue(),
           dashboardApi.getOrdersByStatus(),
           dashboardApi.getTopProducts(),
-        ]);
-        set({
-          summary: sum,
-          revenueHistory: rev || [],
-          ordersByStatus: obs || {},
-          topProducts: top || [],
-        });
-      } catch (dashErr) {
-        console.warn('Dashboard fetch error:', dashErr);
-      }
-
-      // 4. Fetch Products, Orders, Customers, Categories, Coupons in parallel from API
-      await Promise.allSettled([
+        ]),
         useProductStore.getState().fetchProducts(),
         useOrderStore.getState().fetchOrders(),
         useCustomerStore.getState().fetchCustomers(),
         useCategoryStore.getState().fetchCategories(),
         useCouponStore.getState().fetchCoupons(),
+        useUIStore.getState().fetchNotifications(),
       ]);
+      void lists;
 
-      const now = new Date().toISOString();
-      localStorage.setItem('lilium_last_synced', now);
-      set({ status: 'connected', lastSynced: now, errorMessage: null });
+      if (dash.status === 'fulfilled') {
+        const [summary, revenueHistory, ordersByStatus, topProducts] = dash.value;
+        set({ summary, revenueHistory: revenueHistory ?? [], ordersByStatus: ordersByStatus ?? {}, topProducts: topProducts ?? [] });
+      } else {
+        console.warn('Dashboard fetch error:', dash.reason);
+        set({ summary: null, revenueHistory: [], ordersByStatus: {}, topProducts: [] });
+      }
+
+      set({ status: 'connected', lastSynced: new Date().toISOString(), errorMessage: null });
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.warn('Backend sync failed:', err);
-      set({
-        status: 'offline',
-        errorMessage: err?.message || 'Could not connect to backend API',
-      });
+      set({ status: 'offline', errorMessage: readError(err, 'Could not connect to backend API') });
       return false;
     }
   },

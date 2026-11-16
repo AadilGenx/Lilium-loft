@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CreditCard,
   Settings,
@@ -33,42 +33,88 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { usePaymentStore } from '@/store';
+import { usePaymentStore, useOrderStore } from '@/store';
 import { PaymentGateway, Transaction } from '@/types';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function PaymentsPage() {
-  const { gateways, transactions, toggleGateway, updateGateway } = usePaymentStore();
+  const { gateways, isLoading, fetchGateways, toggleGateway, updateGateway } = usePaymentStore();
+  const orders = useOrderStore((s) => s.orders);
+
+  // The ledger is built from the real orders the store reported.
+  const transactions = useMemo<Transaction[]>(
+    () =>
+      orders.map((o) => ({
+        id: `tx-${o.id}`,
+        orderId: o.id,
+        orderNumber: o.orderNumber,
+        customerName: o.customerName,
+        amount: o.total,
+        currency: o.currency,
+        status:
+          o.status === 'completed' || o.status === 'processing'
+            ? 'completed'
+            : o.status === 'refunded'
+            ? 'refunded'
+            : o.status === 'failed' || o.status === 'cancelled'
+            ? 'failed'
+            : 'pending',
+        paymentMethod: o.paymentMethodTitle || o.paymentMethod,
+        date: o.dateCreated,
+        transactionReference: o.transactionId,
+      })),
+    [orders]
+  );
 
   const [activeTab, setActiveTab] = useState('gateways');
   const [configModalGateway, setConfigModalGateway] = useState<PaymentGateway | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Modal form state
   const [formTitle, setFormTitle] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formInstructions, setFormInstructions] = useState('');
-  const [testMode, setTestMode] = useState(false);
+
+  useEffect(() => {
+    fetchGateways();
+  }, [fetchGateways]);
 
   const openConfigModal = (g: PaymentGateway) => {
     setConfigModalGateway(g);
     setFormTitle(g.title);
     setFormDesc(g.description);
     setFormInstructions(g.instructions || '');
-    setTestMode(g.testMode || false);
   };
 
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     if (!configModalGateway) return;
-    updateGateway(configModalGateway.id, {
-      title: formTitle,
-      description: formDesc,
-      instructions: formInstructions,
-      testMode,
-    });
-    toast.success(`Gateway "${formTitle}" updated.`);
-    setConfigModalGateway(null);
+    setSaving(true);
+    try {
+      await updateGateway(configModalGateway.id, {
+        title: formTitle,
+        description: formDesc,
+        // Only gateways that have an instructions field can change it.
+        instructions: configModalGateway.instructions === undefined ? undefined : formInstructions,
+      });
+      toast.success(`Gateway "${formTitle}" updated.`);
+      setConfigModalGateway(null);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleGateway = async (gateway: PaymentGateway, checked: boolean) => {
+    try {
+      await toggleGateway(gateway.id, checked);
+      toast.success(`${gateway.title} is now ${checked ? 'active' : 'inactive'}.`);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const handleExportTransactions = () => {
@@ -113,7 +159,7 @@ export function PaymentsPage() {
             Payment Gateways & Ledger
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Manage online merchant processors, configure offline BACS / COD, and inspect payment transactions.
+            Payment methods from your WooCommerce store, and the payment status of your orders.
           </p>
         </div>
 
@@ -153,6 +199,11 @@ export function PaymentsPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-slate-100">
+                {gateways.length === 0 && (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    {isLoading ? 'Loading payment methods...' : 'No payment methods found.'}
+                  </div>
+                )}
                 {gateways.map((gateway) => (
                   <div
                     key={gateway.id}
@@ -195,12 +246,7 @@ export function PaymentsPage() {
                         </span>
                         <Switch
                           checked={gateway.enabled}
-                          onCheckedChange={(checked) => {
-                            toggleGateway(gateway.id, checked);
-                            toast.success(
-                              `${gateway.title} is now ${checked ? 'active' : 'inactive'}.`
-                            );
-                          }}
+                          onCheckedChange={(checked) => handleToggleGateway(gateway, checked)}
                         />
                       </div>
 
@@ -247,6 +293,13 @@ export function PaymentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {transactions.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-xs text-slate-400 py-8">
+                          No transactions yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
                     {transactions.map((tx) => (
                       <TableRow key={tx.id}>
                         <TableCell className="font-mono text-xs text-slate-700 whitespace-nowrap">
@@ -266,7 +319,7 @@ export function PaymentsPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(tx.status)}</TableCell>
                         <TableCell className="text-right font-bold text-slate-900 whitespace-nowrap">
-                          {formatCurrency(tx.amount)}
+                          {formatCurrency(tx.amount, tx.currency)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -312,23 +365,21 @@ export function PaymentsPage() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Payment Instructions / Details</label>
-                <Textarea
-                  value={formInstructions}
-                  rows={3}
-                  placeholder="Instructions sent to customer on invoice/email..."
-                  onChange={(e) => setFormInstructions(e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <div>
-                  <div className="font-semibold text-slate-800">Sandbox / Test Mode</div>
-                  <div className="text-slate-400">Process test cards without charging real accounts</div>
+              {configModalGateway.instructions !== undefined && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">Payment Instructions / Details</label>
+                  <Textarea
+                    value={formInstructions}
+                    rows={3}
+                    placeholder="Instructions sent to customer on invoice/email..."
+                    onChange={(e) => setFormInstructions(e.target.value)}
+                  />
                 </div>
-                <Switch checked={testMode} onCheckedChange={setTestMode} />
-              </div>
+              )}
+
+              <p className="text-[11px] text-slate-400 pt-1 border-t border-slate-100">
+                API keys, secrets and sandbox mode are managed in WooCommerce itself and cannot be changed here.
+              </p>
             </div>
 
             <DialogFooter>
@@ -342,6 +393,7 @@ export function PaymentsPage() {
               <Button
                 size="sm"
                 onClick={handleSaveConfig}
+                disabled={saving}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
                 Save Configuration

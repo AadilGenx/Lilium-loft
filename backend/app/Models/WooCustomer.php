@@ -34,4 +34,16 @@ class WooCustomer extends Model
     {
         return trim($this->first_name.' '.$this->last_name) ?: ($this->username ?? 'Guest');
     }
+
+    public const DETAIL_ATTRS = ['billing', 'shipping'];
+
+    public function getBillingAttribute(): array
+    {
+        return $this->raw['billing'] ?? [];
+    }
+
+    public function getShippingAttribute(): array
+    {
+        return $this->raw['shipping'] ?? [];
+    }
 }

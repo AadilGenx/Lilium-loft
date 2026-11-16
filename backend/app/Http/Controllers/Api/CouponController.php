@@ -37,7 +37,10 @@ class CouponController extends Controller
             ->when($request->search, fn ($q, $v) => $q->where('code', 'like', "%{$v}%"))
             ->orderBy('code');
 
-        return response()->json($q->paginate((int) $request->input('per_page', 20))->withQueryString());
+        $page = $q->paginate((int) $request->input('per_page', 20))->withQueryString();
+        $page->getCollection()->each->append(WooCoupon::DETAIL_ATTRS);
+
+        return response()->json($page);
     }
 
     #[OA\Get(
@@ -55,6 +58,6 @@ class CouponController extends Controller
     )]
     public function show(int $id): JsonResponse
     {
-        return response()->json(WooCoupon::findOrFail($id));
+        return response()->json(WooCoupon::findOrFail($id)->append(WooCoupon::DETAIL_ATTRS));
     }
 }

@@ -56,7 +56,10 @@ class OrderController extends Controller
             ->when($request->boolean('with_items'), fn ($q) => $q->with('items'))
             ->orderBy($request->input('sort', 'woo_created_at'), $request->input('direction', 'desc'));
 
-        return response()->json($q->paginate((int) $request->input('per_page', 20))->withQueryString());
+        $page = $q->paginate((int) $request->input('per_page', 20))->withQueryString();
+        $page->getCollection()->each->append(WooOrder::DETAIL_ATTRS);
+
+        return response()->json($page);
     }
 
     #[OA\Get(
@@ -74,6 +77,6 @@ class OrderController extends Controller
     )]
     public function show(int $id): JsonResponse
     {
-        return response()->json(WooOrder::with('items')->findOrFail($id));
+        return response()->json(WooOrder::with('items')->findOrFail($id)->append(WooOrder::DETAIL_ATTRS));
     }
 }

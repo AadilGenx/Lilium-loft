@@ -10,7 +10,20 @@ import {
   BackendRevenuePoint,
   BackendTopProduct,
   BackendSyncLog,
+  BackendOrderNote,
+  BackendOrderRefund,
+  BackendShippingZone,
+  BackendPaymentGateway,
+  BackendSettingsGroup,
+  BackendSetting,
+  BackendNotification,
+  BackendSalesReport,
+  BackendCategoryReportRow,
+  BackendProductReportRow,
+  BackendCustomerReportRow,
 } from './types';
+
+const json = (body: unknown) => JSON.stringify(body);
 
 export interface LoginResponse {
   access_token: string;
@@ -26,10 +39,10 @@ export interface UserResponse {
 
 // ----------------- Auth -----------------
 export const authApi = {
-  async login(email: string, password: string):Promise<LoginResponse> {
+  async login(email: string, password: string): Promise<LoginResponse> {
     const res = await apiClient<LoginResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: json({ email, password }),
     });
     setStoredToken(res.access_token);
     return res;
@@ -106,6 +119,18 @@ export const productsApi = {
   async get(id: number | string): Promise<BackendProduct> {
     return apiClient<BackendProduct>(`/products/${id}`);
   },
+
+  async create(payload: Record<string, unknown>): Promise<BackendProduct> {
+    return apiClient<BackendProduct>('/products', { method: 'POST', body: json(payload) });
+  },
+
+  async update(id: number | string, payload: Record<string, unknown>): Promise<BackendProduct> {
+    return apiClient<BackendProduct>(`/products/${id}`, { method: 'PATCH', body: json(payload) });
+  },
+
+  async remove(id: number | string): Promise<void> {
+    await apiClient<void>(`/products/${id}`, { method: 'DELETE' });
+  },
 };
 
 // ----------------- Orders -----------------
@@ -141,6 +166,32 @@ export const ordersApi = {
   async get(id: number | string): Promise<BackendOrder> {
     return apiClient<BackendOrder>(`/orders/${id}`);
   },
+
+  async setStatus(id: number | string, status: string): Promise<BackendOrder> {
+    return apiClient<BackendOrder>(`/orders/${id}/status`, { method: 'PUT', body: json({ status }) });
+  },
+
+  async notes(id: number | string): Promise<BackendOrderNote[]> {
+    return apiClient<BackendOrderNote[]>(`/orders/${id}/notes`);
+  },
+
+  async addNote(id: number | string, note: string, customerNote: boolean): Promise<BackendOrderNote> {
+    return apiClient<BackendOrderNote>(`/orders/${id}/notes`, {
+      method: 'POST',
+      body: json({ note, customer_note: customerNote }),
+    });
+  },
+
+  async refunds(id: number | string): Promise<BackendOrderRefund[]> {
+    return apiClient<BackendOrderRefund[]>(`/orders/${id}/refunds`);
+  },
+
+  async addRefund(id: number | string, amount: number, reason: string): Promise<BackendOrderRefund> {
+    return apiClient<BackendOrderRefund>(`/orders/${id}/refunds`, {
+      method: 'POST',
+      body: json({ amount, reason }),
+    });
+  },
 };
 
 // ----------------- Customers -----------------
@@ -168,6 +219,18 @@ export const customersApi = {
   async get(id: number | string): Promise<BackendCustomer> {
     return apiClient<BackendCustomer>(`/customers/${id}`);
   },
+
+  async create(payload: Record<string, unknown>): Promise<BackendCustomer> {
+    return apiClient<BackendCustomer>('/customers', { method: 'POST', body: json(payload) });
+  },
+
+  async update(id: number | string, payload: Record<string, unknown>): Promise<BackendCustomer> {
+    return apiClient<BackendCustomer>(`/customers/${id}`, { method: 'PATCH', body: json(payload) });
+  },
+
+  async remove(id: number | string): Promise<void> {
+    await apiClient<void>(`/customers/${id}`, { method: 'DELETE' });
+  },
 };
 
 // ----------------- Categories -----------------
@@ -182,6 +245,14 @@ export const categoriesApi = {
 
   async get(id: number | string): Promise<BackendCategory> {
     return apiClient<BackendCategory>(`/categories/${id}`);
+  },
+
+  async create(payload: Record<string, unknown>): Promise<BackendCategory> {
+    return apiClient<BackendCategory>('/categories', { method: 'POST', body: json(payload) });
+  },
+
+  async remove(id: number | string): Promise<void> {
+    await apiClient<void>(`/categories/${id}`, { method: 'DELETE' });
   },
 };
 
@@ -198,5 +269,124 @@ export const couponsApi = {
   async get(id: number | string): Promise<BackendCoupon> {
     return apiClient<BackendCoupon>(`/coupons/${id}`);
   },
+
+  async create(payload: Record<string, unknown>): Promise<BackendCoupon> {
+    return apiClient<BackendCoupon>('/coupons', { method: 'POST', body: json(payload) });
+  },
+
+  async update(id: number | string, payload: Record<string, unknown>): Promise<BackendCoupon> {
+    return apiClient<BackendCoupon>(`/coupons/${id}`, { method: 'PATCH', body: json(payload) });
+  },
+
+  async remove(id: number | string): Promise<void> {
+    await apiClient<void>(`/coupons/${id}`, { method: 'DELETE' });
+  },
 };
 
+// ----------------- Shipping -----------------
+export const shippingApi = {
+  async zones(): Promise<BackendShippingZone[]> {
+    return apiClient<BackendShippingZone[]>('/shipping/zones');
+  },
+
+  async addMethod(zoneId: number | string, payload: Record<string, unknown>): Promise<void> {
+    await apiClient<unknown>(`/shipping/zones/${zoneId}/methods`, { method: 'POST', body: json(payload) });
+  },
+
+  async updateMethod(
+    zoneId: number | string,
+    instanceId: number | string,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    await apiClient<unknown>(`/shipping/zones/${zoneId}/methods/${instanceId}`, {
+      method: 'PATCH',
+      body: json(payload),
+    });
+  },
+
+  async removeMethod(zoneId: number | string, instanceId: number | string): Promise<void> {
+    await apiClient<void>(`/shipping/zones/${zoneId}/methods/${instanceId}`, { method: 'DELETE' });
+  },
+};
+
+// ----------------- Payments -----------------
+export const paymentsApi = {
+  async list(): Promise<BackendPaymentGateway[]> {
+    return apiClient<BackendPaymentGateway[]>('/payments');
+  },
+
+  async update(id: string, payload: Record<string, unknown>): Promise<void> {
+    await apiClient<unknown>(`/payments/${id}`, { method: 'PATCH', body: json(payload) });
+  },
+};
+
+// ----------------- Settings -----------------
+export const settingsApi = {
+  async groups(): Promise<BackendSettingsGroup[]> {
+    return apiClient<BackendSettingsGroup[]>('/settings');
+  },
+
+  async group(id: string): Promise<BackendSetting[]> {
+    return apiClient<BackendSetting[]>(`/settings/${id}`);
+  },
+
+  async update(groupId: string, settings: Record<string, string | boolean | string[]>): Promise<void> {
+    await apiClient<unknown>(`/settings/${groupId}`, { method: 'PUT', body: json({ settings }) });
+  },
+};
+
+// ----------------- Notifications -----------------
+export const notificationsApi = {
+  async list(): Promise<{ unread: number; data: BackendNotification[] }> {
+    return apiClient<{ unread: number; data: BackendNotification[] }>('/notifications?days=30&limit=50');
+  },
+
+  async markRead(ids: string[]): Promise<void> {
+    await apiClient<unknown>('/notifications/read', { method: 'POST', body: json({ ids }) });
+  },
+
+  async markAllRead(): Promise<void> {
+    await apiClient<unknown>('/notifications/read', { method: 'POST', body: json({ all: true }) });
+  },
+};
+
+// ----------------- Import from WooCommerce -----------------
+export interface StoreImportResult {
+  ok: boolean;
+  results: { resource: string; status: 'ok' | 'failed'; records: number; error: string | null }[];
+  finished_at: string;
+}
+
+export const syncApi = {
+  /** Asks the backend to pull everything from WooCommerce into its database (read-only towards the store). */
+  async run(): Promise<StoreImportResult> {
+    return apiClient<StoreImportResult>('/sync', { method: 'POST' });
+  },
+};
+
+// ----------------- Reports -----------------
+export interface ReportRange {
+  from: string;
+  to: string;
+}
+
+const rangeQuery = (r: ReportRange, extra: Record<string, string> = {}) =>
+  new URLSearchParams({ from: r.from, to: r.to, ...extra }).toString();
+
+export const reportsApi = {
+  async sales(r: ReportRange, groupBy: 'day' | 'week' | 'month'): Promise<BackendSalesReport> {
+    return apiClient<BackendSalesReport>(`/reports/sales?${rangeQuery(r, { group_by: groupBy })}`);
+  },
+
+  async products(r: ReportRange): Promise<BackendProductReportRow[]> {
+    return apiClient<BackendProductReportRow[]>(`/reports/products?${rangeQuery(r, { limit: '10' })}`);
+  },
+
+  async categories(r: ReportRange): Promise<BackendCategoryReportRow[]> {
+    return apiClient<BackendCategoryReportRow[]>(`/reports/categories?${rangeQuery(r)}`);
+  },
+
+  async customers(r: ReportRange): Promise<BackendCustomerReportRow[]> {
+    return apiClient<BackendCustomerReportRow[]>(`/reports/customers?${rangeQuery(r, { limit: '10' })}`);
+  },
+};

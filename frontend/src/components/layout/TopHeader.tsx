@@ -5,20 +5,29 @@ import { Button } from '@/components/ui/button';
 import { NotificationDropdown } from './NotificationDropdown';
 import { ProfileDropdown } from './ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function TopHeader() {
   const { setMobileMenuOpen, setSearchOpen } = useUIStore();
-  const { status, syncAll, lastSynced } = useBackendSyncStore();
+  const { status, importFromStore, lastSynced } = useBackendSyncStore();
   const navigate = useNavigate();
 
+  // Pulls everything from WooCommerce into the database, then reloads the screens from it.
   const handleManualSync = async () => {
-    toast.info('Connecting to backend API...');
-    const success = await syncAll();
-    if (success) {
-      toast.success('Successfully synced data from backend!');
-    } else {
-      toast.error('Could not connect to backend API. Using local/mock data.');
+    try {
+      const res = await importFromStore();
+      if (res.ok) {
+        const total = res.results.reduce((n, r) => n + r.records, 0);
+        toast.success(`Synced from WooCommerce: ${total} records.`);
+      } else {
+        const failed = res.results.filter((r) => r.status === 'failed');
+        toast.error(
+          `Sync incomplete. Failed: ${failed.map((r) => r.resource).join(', ')}. ${failed[0]?.error ?? ''}`.trim()
+        );
+      }
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Sync failed: could not reach the backend.'));
     }
   };
 
@@ -78,10 +87,11 @@ export function TopHeader() {
       <div className="flex items-center gap-1 sm:gap-3 shrink-0">
         <Button
           onClick={handleManualSync}
+          disabled={status === 'syncing'}
           variant="outline"
           size="sm"
           className="hidden sm:inline-flex gap-1.5 text-xs text-slate-700 border-slate-200 hover:bg-slate-50"
-          title={lastSynced ? `Last synced: ${new Date(lastSynced).toLocaleTimeString()}` : 'Sync with Backend'}
+          title={lastSynced ? `Last loaded: ${new Date(lastSynced).toLocaleTimeString()}. Click to import the latest from WooCommerce.` : 'Import the latest from WooCommerce'}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${status === 'syncing' ? 'animate-spin' : ''}`} />
           <span>{status === 'connected' ? 'Sync' : 'Connect API'}</span>

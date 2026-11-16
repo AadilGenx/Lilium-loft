@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -37,14 +37,20 @@ import {
 import { useOrderStore } from '@/store';
 import { OrderStatus } from '@/types';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orders, updateOrderStatus, addOrderNote, refundOrder } = useOrderStore();
+  const { orders, loadOrderDetails, updateOrderStatus, addOrderNote, refundOrder } = useOrderStore();
 
   const order = orders.find((o) => o.id === id);
+
+  // Notes and refunds live in WooCommerce; load them for this order.
+  useEffect(() => {
+    if (id && order?.id) loadOrderDetails(id);
+  }, [id, order?.id, loadOrderDetails]);
 
   // New Note State
   const [newNote, setNewNote] = useState('');
@@ -70,21 +76,29 @@ export function OrderDetailPage() {
   const totalRefunded = order.refunds.reduce((sum, r) => sum + r.amount, 0);
   const remainingRefundable = Math.max(0, order.total - totalRefunded);
 
-  const handleStatusChange = (newStatus: OrderStatus) => {
-    updateOrderStatus(order.id, newStatus);
-    toast.success(`Order status changed to ${newStatus}.`);
+  const handleStatusChange = async (newStatus: OrderStatus) => {
+    try {
+      await updateOrderStatus(order.id, newStatus);
+      toast.success(`Order status changed to ${newStatus}.`);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
-  const handleAddNote = (e: React.FormEvent) => {
+  const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim()) return;
 
-    addOrderNote(order.id, newNote.trim(), isCustomerNote);
-    setNewNote('');
-    toast.success('Note added to order history.');
+    try {
+      await addOrderNote(order.id, newNote.trim(), isCustomerNote);
+      setNewNote('');
+      toast.success('Note added to order history.');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
-  const handleProcessRefund = () => {
+  const handleProcessRefund = async () => {
     if (refundAmount <= 0) {
       toast.error('Refund amount must be greater than ₹0.');
       return;
@@ -98,10 +112,14 @@ export function OrderDetailPage() {
       return;
     }
 
-    refundOrder(order.id, refundAmount, refundReason.trim());
-    toast.success(`Refund of ${formatCurrency(refundAmount)} processed successfully.`);
-    setRefundModalOpen(false);
-    setRefundReason('');
+    try {
+      await refundOrder(order.id, refundAmount, refundReason.trim());
+      toast.success(`Refund of ${formatCurrency(refundAmount)} recorded in WooCommerce.`);
+      setRefundModalOpen(false);
+      setRefundReason('');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const getStatusBadge = (status: OrderStatus) => {
@@ -504,10 +522,10 @@ export function OrderDetailPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <RotateCcw className="h-4 w-4 text-red-600" />
-              <span>Process Order Refund</span>
+              <span>Record Order Refund</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Issue a full or partial refund to the customer via {order.paymentMethodTitle}.
+              Records a refund on this order in WooCommerce. It does not send money back: return the payment to the customer through {order.paymentMethodTitle || 'the payment gateway'}.
             </DialogDescription>
           </DialogHeader>
 

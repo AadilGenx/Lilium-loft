@@ -8,6 +8,7 @@ use App\Models\WooOrder;
 use App\Models\WooOrderItem;
 use App\Models\WooProduct;
 use App\Models\WooSyncLog;
+use App\Services\WooCommerce\WooErrors;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -135,9 +136,13 @@ class DashboardController extends Controller
         parameters: [new OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 50, default: 10))],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(type: 'array', items: new OA\Items(properties: [
+                new OA\Property(property: 'id', type: 'integer', description: 'Local product id (falls back to the WooCommerce id if the product is not in the local copy)'),
                 new OA\Property(property: 'product_woo_id', type: 'integer'),
                 new OA\Property(property: 'name', type: 'string'),
+                new OA\Property(property: 'sku', type: 'string', nullable: true),
+                new OA\Property(property: 'image_url', type: 'string', nullable: true),
                 new OA\Property(property: 'units', type: 'integer'),
+                new OA\Property(property: 'total_sales', type: 'integer', description: 'Same as units'),
                 new OA\Property(property: 'revenue', type: 'number', format: 'float'),
             ]))),
             new OA\Response(response: 401, ref: '#/components/responses/Unauthenticated'),
@@ -152,15 +157,27 @@ class DashboardController extends Controller
             ->whereIn('woo_orders.status', self::PAID)
             ->selectRaw('woo_order_items.product_woo_id, MIN(woo_order_items.name) as name, SUM(woo_order_items.quantity) as units, SUM(woo_order_items.total) as revenue')
             ->groupBy('woo_order_items.product_woo_id')
-            ->orderByDesc('units')->limit($limit)->get()
-            ->map(fn ($r) => [
+            ->orderByDesc('units')->limit($limit)->get();
+
+        // Local product rows give each entry its local id and image.
+        $products = WooProduct::whereIn('woo_id', $rows->pluck('product_woo_id'))
+            ->get(['id', 'woo_id', 'image_url', 'sku'])->keyBy('woo_id');
+
+        return response()->json($rows->map(function ($r) use ($products) {
+            $product = $products->get($r->product_woo_id);
+
+            return [
+                // `id` is the local product id (what /products/{id} uses); `total_sales` is the units sold.
+                'id' => $product?->id ?? (int) $r->product_woo_id,
                 'product_woo_id' => (int) $r->product_woo_id,
                 'name' => $r->name,
+                'sku' => $product?->sku,
+                'image_url' => $product?->image_url,
                 'units' => (int) $r->units,
+                'total_sales' => (int) $r->units,
                 'revenue' => (float) $r->revenue,
-            ]);
-
-        return response()->json($rows);
+            ];
+        })->values());
     }
 
     #[OA\Get(
@@ -186,8 +203,10 @@ class DashboardController extends Controller
     {
         $latest = WooSyncLog::selectRaw('MAX(id) as id')->groupBy('resource');
 
+        // The stored error text can contain internal details: only say that it failed (the log has the rest).
         return response()->json(
             WooSyncLog::whereIn('id', $latest)->orderBy('resource')->get(['resource', 'status', 'records', 'error', 'started_at', 'finished_at'])
+                ->map(fn ($log) => array_merge($log->toArray(), ['error' => $log->error ? WooErrors::IMPORT_FAILED : null]))
         );
     }
 

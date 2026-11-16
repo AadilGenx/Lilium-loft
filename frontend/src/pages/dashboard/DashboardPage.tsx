@@ -27,6 +27,7 @@ import {
 import { useProductStore, useOrderStore, useCustomerStore, useBackendSyncStore } from '@/store';
 import { formatCurrency, formatDate, formatNumber } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
+import { stockState } from '@/utils/stock';
 import {
   AreaChart,
   Area,
@@ -56,78 +57,52 @@ export function DashboardPage() {
   const customers = useCustomerStore((s) => s.customers);
   const { summary, revenueHistory, topProducts: backendTopProducts } = useBackendSyncStore();
 
-  // Computed metrics
-  const totalRevenue = summary
-    ? summary.revenue
-    : orders
-        .filter((o) => o.status !== 'cancelled' && o.status !== 'failed')
-        .reduce((sum, o) => sum + o.total, 0);
+  // Everything here comes from the backend dashboard endpoints; with no data it simply shows zeros / empty states.
+  const totalRevenue = summary?.revenue ?? 0;
+  const ordersInPeriod = summary?.orders ?? 0;
+  const processingOrders = summary?.awaiting_fulfilment ?? 0;
 
-  const completedOrders = summary
-    ? summary.orders
-    : orders.filter((o) => o.status === 'completed').length;
+  const pctChange = (current: number, previous: number): number | null =>
+    previous > 0 ? ((current - previous) / previous) * 100 : null;
+  const revenueChange = summary ? pctChange(summary.revenue, summary.previous_revenue) : null;
+  const ordersChange = summary ? pctChange(summary.orders, summary.previous_orders) : null;
 
-  const processingOrders = summary
-    ? summary.awaiting_fulfilment
-    : orders.filter((o) => o.status === 'processing').length;
+  const Change = ({ value }: { value: number | null }) =>
+    value === null ? null : (
+      <span
+        className={`flex items-center font-medium ${value >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
+      >
+        <TrendingUp className={`h-3.5 w-3.5 mr-0.5 ${value < 0 ? 'rotate-180' : ''}`} />
+        {value >= 0 ? '+' : ''}
+        {value.toFixed(1)}%
+      </span>
+    );
 
-  const lowStockProducts = products.filter(
-    (p) => p.manageStock && p.stockQuantity <= 5
-  );
+  const lowStockProducts = products.filter((p) => stockState(p) !== 'in');
 
-  // Sales Chart Data from real API revenue history or real orders
-  const activeChartData = useMemo(() => {
-    if (revenueHistory && revenueHistory.length > 0) {
-      return revenueHistory.map((pt) => ({
+  const activeChartData = useMemo(
+    () =>
+      (revenueHistory ?? []).map((pt) => ({
         date: pt.date.slice(5),
         sales: pt.revenue,
         orders: pt.orders,
-      }));
-    }
+      })),
+    [revenueHistory]
+  );
 
-    if (orders.length > 0) {
-      const byDate: Record<string, { sales: number; orders: number }> = {};
-      orders.forEach((o) => {
-        const d = (o.dateCreated || '').slice(5, 10);
-        if (!d) return;
-        if (!byDate[d]) byDate[d] = { sales: 0, orders: 0 };
-        byDate[d].sales += o.total;
-        byDate[d].orders += 1;
-      });
-      return Object.entries(byDate)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, val]) => ({ date, ...val }));
-    }
-
-    return [];
-  }, [revenueHistory, orders]);
-
-  const topSellingProducts = useMemo<TopProductItem[]>(() => {
-    if (backendTopProducts && backendTopProducts.length > 0) {
-      return backendTopProducts.slice(0, 5).map((tp) => {
-        const prod = products.find((p) => p.id === String(tp.id));
-        return {
-          id: String(tp.id),
-          name: tp.name,
-          sku: prod?.sku || `SKU-${tp.id}`,
-          price: prod?.price || (tp.total_sales > 0 ? tp.revenue / tp.total_sales : 0),
-          salesCount: tp.total_sales,
-          revenue: tp.revenue,
-          image: prod?.images?.[0]?.src || '',
-        };
-      });
-    }
-
-    return products.slice(0, 5).map((p) => ({
-      id: p.id,
-      name: p.name,
-      sku: p.sku,
-      price: p.price,
-      salesCount: 0,
-      revenue: p.price,
-      image: p.images?.[0]?.src || '',
-    }));
-  }, [backendTopProducts, products]);
+  const topSellingProducts = useMemo<TopProductItem[]>(
+    () =>
+      (backendTopProducts ?? []).slice(0, 5).map((tp) => ({
+        id: String(tp.id),
+        name: tp.name,
+        sku: tp.sku ?? '',
+        price: tp.total_sales > 0 ? tp.revenue / tp.total_sales : 0,
+        salesCount: tp.total_sales,
+        revenue: tp.revenue,
+        image: tp.image_url ?? '',
+      })),
+    [backendTopProducts]
+  );
 
   const handleExportSummary = () => {
     exportToCSV(
@@ -218,10 +193,10 @@ export function DashboardPage() {
                 {formatCurrency(totalRevenue)}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
-                <span className="flex items-center text-emerald-600 font-medium">
-                  <TrendingUp className="h-3.5 w-3.5 mr-0.5" /> +14.8%
+                <Change value={revenueChange} />
+                <span className="text-slate-400">
+                  {revenueChange === null ? `last ${summary?.days ?? 30} days` : 'vs previous period'}
                 </span>
-                <span className="text-slate-400">vs last month</span>
               </div>
             </div>
           </CardContent>
@@ -232,7 +207,7 @@ export function DashboardPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Total Orders
+                Orders
               </span>
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                 <ShoppingCart className="h-5 w-5" />
@@ -240,12 +215,10 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatNumber(orders.length)}
+                {formatNumber(ordersInPeriod)}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
-                <span className="flex items-center text-emerald-600 font-medium">
-                  <TrendingUp className="h-3.5 w-3.5 mr-0.5" /> +8.2%
-                </span>
+                <Change value={ordersChange} />
                 <span className="text-slate-400">
                   {processingOrders} processing
                 </span>
@@ -267,18 +240,17 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatNumber(products.length)}
+                {formatNumber(summary?.published_products ?? 0)}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
-                {lowStockProducts.length > 0 ? (
+                {(summary?.out_of_stock_products ?? 0) > 0 ? (
                   <span className="flex items-center text-amber-600 font-medium">
                     <AlertTriangle className="h-3.5 w-3.5 mr-0.5" />
-                    {lowStockProducts.length} low stock
+                    {summary?.out_of_stock_products} out of stock
                   </span>
                 ) : (
-                  <span className="text-emerald-600 font-medium">Healthy Stock</span>
+                  <span className="text-slate-400">published products</span>
                 )}
-                <span className="text-slate-400">in inventory</span>
               </div>
             </div>
           </CardContent>
@@ -297,13 +269,10 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatNumber(customers.length)}
+                {formatNumber(summary?.customers ?? 0)}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
-                <span className="flex items-center text-emerald-600 font-medium">
-                  <TrendingUp className="h-3.5 w-3.5 mr-0.5" /> +24%
-                </span>
-                <span className="text-slate-400">growth rate</span>
+                <span className="text-slate-400">registered customers</span>
               </div>
             </div>
           </CardContent>
@@ -332,6 +301,11 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-4">
             <div className="h-[280px] w-full">
+              {activeChartData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  No sales data yet.
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={activeChartData}
@@ -386,6 +360,7 @@ export function DashboardPage() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -414,7 +389,7 @@ export function DashboardPage() {
           <CardContent className="flex-1 overflow-y-auto divide-y divide-slate-100 p-0 px-6">
             {lowStockProducts.length === 0 ? (
               <div className="py-8 text-center text-xs text-slate-400">
-                All inventory items are well-stocked.
+                No low-stock or out-of-stock products.
               </div>
             ) : (
               lowStockProducts.map((p) => (
@@ -439,12 +414,12 @@ export function DashboardPage() {
                   <div className="text-right">
                     <span
                       className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
-                        p.stockQuantity === 0
+                        stockState(p) === 'out'
                           ? 'bg-red-100 text-red-700'
                           : 'bg-amber-100 text-amber-700'
                       }`}
                     >
-                      {p.stockQuantity} left
+                      {stockState(p) === 'out' ? 'Out of stock' : `${p.stockQuantity} left`}
                     </span>
                     <button
                       onClick={() => navigate('/inventory')}
@@ -484,6 +459,9 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100">
+              {orders.length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-400">No orders yet.</div>
+              )}
               {orders.slice(0, 5).map((order) => (
                 <div
                   key={order.id}
@@ -539,6 +517,9 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100">
+              {topSellingProducts.length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-400">No sales yet.</div>
+              )}
               {topSellingProducts.map((p, idx) => (
                 <div
                   key={p.id}
@@ -550,11 +531,13 @@ export function DashboardPage() {
                       #{idx + 1}
                     </span>
                     <div className="h-10 w-10 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        className="h-full w-full object-cover"
-                      />
+                      {p.image && (
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          className="h-full w-full object-cover"
+                        />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-800 truncate max-w-[180px]">

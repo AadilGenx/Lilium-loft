@@ -34,4 +34,32 @@ class WooProduct extends Model
     {
         return $this->belongsToMany(WooCategory::class, 'woo_category_product', 'product_woo_id', 'category_woo_id', 'woo_id', 'woo_id');
     }
+
+    /** Fields that live only in the raw WooCommerce payload. Append them where the full record is needed. */
+    public const DETAIL_ATTRS = ['description', 'short_description', 'featured', 'gallery'];
+
+    public function getDescriptionAttribute(): ?string
+    {
+        return $this->raw['description'] ?? null;
+    }
+
+    public function getShortDescriptionAttribute(): ?string
+    {
+        return $this->raw['short_description'] ?? null;
+    }
+
+    public function getFeaturedAttribute(): bool
+    {
+        return (bool) ($this->raw['featured'] ?? false);
+    }
+
+    /** @return array<int, array{id: int, src: string, alt: string}> */
+    public function getGalleryAttribute(): array
+    {
+        return collect($this->raw['images'] ?? [])->map(fn ($i) => [
+            'id' => $i['id'] ?? 0,
+            'src' => $i['src'] ?? '',
+            'alt' => $i['alt'] ?? '',
+        ])->values()->all();
+    }
 }

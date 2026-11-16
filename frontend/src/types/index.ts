@@ -1,5 +1,5 @@
-export type ProductType = 'simple' | 'variable';
-export type ProductStatus = 'publish' | 'draft' | 'pending';
+export type ProductType = 'simple' | 'variable' | 'grouped' | 'external';
+export type ProductStatus = 'publish' | 'draft' | 'pending' | 'private';
 export type StockStatus = 'instock' | 'outofstock' | 'onbackorder';
 
 export interface ProductImage {
@@ -30,6 +30,8 @@ export interface ProductVariation {
 
 export interface ProductCategory {
   id: string;
+  /** WooCommerce category id; this is what product create/update sends. */
+  wooId: number;
   name: string;
   slug: string;
   description?: string;
@@ -46,6 +48,8 @@ export interface ProductTag {
 
 export interface Product {
   id: string;
+  /** WooCommerce product id; order line items refer to products by this. */
+  wooId: number;
   name: string;
   slug: string;
   sku: string;
@@ -123,6 +127,7 @@ export interface OrderRefund {
 export interface Order {
   id: string;
   orderNumber: string;
+  currency: string;
   status: OrderStatus;
   dateCreated: string;
   customerId: string;
@@ -145,11 +150,12 @@ export interface Order {
 
 export interface Customer {
   id: string;
+  /** WooCommerce customer id; orders refer to customers by this (0 for guests). */
+  wooId: number;
   firstName: string;
   lastName: string;
   email: string;
   username: string;
-  avatarUrl: string;
   role: string;
   registeredDate: string;
   totalOrders: number;
@@ -179,9 +185,11 @@ export interface Coupon {
 
 export interface ShippingMethod {
   id: string;
-  type: 'flat_rate' | 'free_shipping' | 'local_pickup';
+  /** WooCommerce method type, e.g. flat_rate, free_shipping, local_pickup. */
+  type: string;
   title: string;
-  cost: number;
+  /** null when the method has no cost setting. */
+  cost: number | null;
   enabled: boolean;
   taxStatus: 'taxable' | 'none';
 }
@@ -216,58 +224,3 @@ export interface Transaction {
   date: string;
   transactionReference: string;
 }
-
-export interface SettingsState {
-  general: {
-    storeName: string;
-    storeAddress: string;
-    storeCity: string;
-    storePostcode: string;
-    storeCountry: string;
-    storeCurrency: string;
-    currencyPosition: 'left' | 'right' | 'left_space' | 'right_space';
-    thousandSeparator: string;
-    decimalSeparator: string;
-    numberOfDecimals: number;
-  };
-  products: {
-    weightUnit: string;
-    dimensionUnit: string;
-    enableReviews: boolean;
-    enableProductRatings: boolean;
-    manageStock: boolean;
-    lowStockThreshold: number;
-    outOfStockThreshold: number;
-    notifyLowStock: boolean;
-    notifyOutOfStock: boolean;
-    notificationRecipient: string;
-  };
-  tax: {
-    enableTaxes: boolean;
-    pricesIncludeTax: boolean;
-    calculateTaxBasedOn: 'shipping' | 'billing' | 'base';
-    shippingTaxClass: string;
-    roundTaxAtSubtotal: boolean;
-    standardTaxRate: number;
-  };
-  shipping: {
-    enableShipping: boolean;
-    shippingCalculations: boolean;
-    shippingDestination: 'shipping' | 'billing' | 'force_billing';
-    defaultShippingCost: number;
-  };
-  payments: {
-    defaultGateway: string;
-    allowGuestCheckout: boolean;
-    enforceSsl: boolean;
-  };
-  email: {
-    senderName: string;
-    senderEmail: string;
-    adminNewOrder: boolean;
-    customerCompletedOrder: boolean;
-    customerInvoice: boolean;
-    emailFooterText: string;
-  };
-}
-

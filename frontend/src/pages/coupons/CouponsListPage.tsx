@@ -49,10 +49,11 @@ import { Coupon, CouponDiscountType } from '@/types';
 import { couponSchema, CouponFormValues } from '@/schemas';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function CouponsListPage() {
-  const { coupons, fetchCoupons, addCoupon, updateCoupon, deleteCoupon } = useCouponStore();
+  const { coupons, fetchCoupons, createCoupon, updateCoupon, deleteCoupon } = useCouponStore();
 
   useEffect(() => {
     if (coupons.length === 0) {
@@ -112,7 +113,7 @@ export function CouponsListPage() {
       discountType: coupon.discountType,
       amount: coupon.amount,
       description: coupon.description,
-      expiryDate: coupon.expiryDate || '',
+      expiryDate: coupon.expiryDate ? coupon.expiryDate.slice(0, 10) : '',
       usageLimit: coupon.usageLimit,
       individualUse: coupon.individualUse,
       minimumAmount: coupon.minimumAmount,
@@ -122,22 +123,29 @@ export function CouponsListPage() {
     setModalOpen(true);
   };
 
-  const onSubmit = (data: CouponFormValues) => {
-    if (editingCoupon) {
-      updateCoupon(editingCoupon.id, data);
-      toast.success(`Coupon "${data.code}" updated.`);
-    } else {
-      addCoupon(data);
-      toast.success(`Coupon "${data.code}" created.`);
+  const onSubmit = async (data: CouponFormValues) => {
+    try {
+      if (editingCoupon) {
+        await updateCoupon(editingCoupon.id, data);
+        toast.success(`Coupon "${data.code}" updated.`);
+      } else {
+        await createCoupon(data);
+        toast.success(`Coupon "${data.code}" created.`);
+      }
+      setModalOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
-    setModalOpen(false);
   };
 
-  const handleDelete = () => {
-    if (couponToDelete) {
-      deleteCoupon(couponToDelete.id);
-      toast.success(`Coupon "${couponToDelete.code}" deleted.`);
+  const handleDelete = async () => {
+    if (!couponToDelete) return;
+    try {
+      await deleteCoupon(couponToDelete.id);
+      toast.success(`Coupon "${couponToDelete.code}" moved to the trash.`);
       setCouponToDelete(null);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
   };
 

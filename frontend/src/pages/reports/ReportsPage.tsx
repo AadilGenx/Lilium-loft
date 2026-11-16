@@ -1,16 +1,5 @@
-import React, { useState } from 'react';
-import {
-  BarChart3,
-  TrendingUp,
-  DollarSign,
-  ShoppingCart,
-  Users,
-  Download,
-  Calendar,
-  Layers,
-  CheckCircle2,
-  Package,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -37,60 +26,125 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
 } from 'recharts';
-import { useProductStore, useOrderStore, useCustomerStore } from '@/store';
-import { formatCurrency, formatNumber } from '@/utils/formatters';
+import {
+  reportsApi,
+  BackendSalesReport,
+  BackendCategoryReportRow,
+  BackendProductReportRow,
+  BackendCustomerReportRow,
+  ReportRange,
+} from '@/services/api';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
 import { toast } from 'sonner';
+
+const isoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Date range and chart grouping for each period choice. */
+function rangeFor(period: string): { range: ReportRange; groupBy: 'day' | 'week' | 'month' } {
+  const to = new Date();
+  const from = new Date();
+  if (period === '7d') from.setDate(to.getDate() - 6);
+  else if (period === '30d') from.setDate(to.getDate() - 29);
+  else if (period === '90d') from.setDate(to.getDate() - 89);
+  else {
+    from.setMonth(0, 1);
+  }
+  const groupBy = period === '7d' || period === '30d' ? 'day' : period === '90d' ? 'week' : 'month';
+  return { range: { from: isoDay(from), to: isoDay(to) }, groupBy };
+}
+
+const EmptyChart = ({ text }: { text: string }) => (
+  <div className="h-full w-full flex items-center justify-center text-xs text-slate-400">{text}</div>
+);
 
 export function ReportsPage() {
   const [period, setPeriod] = useState('30d');
   const [reportTab, setReportTab] = useState('sales');
+  const [loading, setLoading] = useState(false);
 
-  const products = useProductStore((s) => s.products);
-  const orders = useOrderStore((s) => s.orders);
-  const customers = useCustomerStore((s) => s.customers);
+  const [sales, setSales] = useState<BackendSalesReport | null>(null);
+  const [categories, setCategories] = useState<BackendCategoryReportRow[]>([]);
+  const [products, setProducts] = useState<BackendProductReportRow[]>([]);
+  const [customers, setCustomers] = useState<BackendCustomerReportRow[]>([]);
 
-  // Sales Analytics Sample Datasets
-  const salesTimeSeries = [
-    { period: 'Week 1', gross: 4200, net: 3890, orders: 14 },
-    { period: 'Week 2', gross: 5600, net: 5120, orders: 19 },
-    { period: 'Week 3', gross: 7100, net: 6540, orders: 24 },
-    { period: 'Week 4', gross: 8400, net: 7890, orders: 28 },
-  ];
+  // Reads never raise toasts: a failed report simply shows its empty state.
+  useEffect(() => {
+    let cancelled = false;
+    const { range, groupBy } = rangeFor(period);
+    setLoading(true);
 
-  const categoryPerformance = [
-    { category: 'Watches', revenue: 10458, units: 42 },
-    { category: 'Leather Goods', revenue: 9349, units: 30 },
-    { category: 'Audio & Tech', revenue: 6615, units: 35 },
-    { category: 'Apparel', revenue: 5225, units: 48 },
-    { category: 'Home & Living', revenue: 2140, units: 38 },
-  ];
+    Promise.allSettled([
+      reportsApi.sales(range, groupBy),
+      reportsApi.categories(range),
+      reportsApi.products(range),
+      reportsApi.customers(range),
+    ]).then(([s, c, p, cu]) => {
+      if (cancelled) return;
+      setSales(s.status === 'fulfilled' ? s.value : null);
+      setCategories(c.status === 'fulfilled' ? c.value : []);
+      setProducts(p.status === 'fulfilled' ? p.value : []);
+      setCustomers(cu.status === 'fulfilled' ? cu.value : []);
+      setLoading(false);
+    });
 
-  const customerCohorts = [
-    { month: 'Nov', newUsers: 34, returning: 12 },
-    { month: 'Dec', newUsers: 58, returning: 24 },
-    { month: 'Jan', newUsers: 46, returning: 31 },
-    { month: 'Feb', newUsers: 62, returning: 39 },
-  ];
+    return () => {
+      cancelled = true;
+    };
+  }, [period]);
+
+  const salesSeries = useMemo(
+    () =>
+      (sales?.data ?? []).map((d) => ({
+        period: formatDate(d.period),
+        gross: d.gross_sales,
+        net: d.net_sales,
+        orders: d.orders,
+      })),
+    [sales]
+  );
+  const hasSales = (sales?.totals.orders ?? 0) > 0;
+  const totals = sales?.totals;
 
   const handleExportCurrentReport = () => {
     if (reportTab === 'sales') {
-      exportToCSV(salesTimeSeries, 'woocommerce-sales-report');
+      exportToCSV(
+        (sales?.data ?? []).map((d) => ({
+          Period: d.period,
+          Orders: d.orders,
+          GrossSales: d.gross_sales,
+          NetSales: d.net_sales,
+          Discounts: d.discounts,
+          Shipping: d.shipping,
+          Tax: d.tax,
+        })),
+        'woocommerce-sales-report'
+      );
     } else if (reportTab === 'products') {
-      exportToCSV(categoryPerformance, 'woocommerce-product-category-report');
+      exportToCSV(
+        categories.map((c) => ({ Category: c.name, Orders: c.orders, Units: c.units, Revenue: c.revenue })),
+        'woocommerce-category-report'
+      );
     } else {
-      exportToCSV(customerCohorts, 'woocommerce-customer-cohort-report');
+      exportToCSV(
+        customers.map((c) => ({
+          Customer: c.name ?? '',
+          Email: c.email,
+          Orders: c.orders,
+          TotalSpent: c.total_spent,
+          LastOrder: c.last_order_at,
+        })),
+        'woocommerce-customer-report'
+      );
     }
     toast.success('CSV export generated successfully.');
   };
 
-  const totalGross = salesTimeSeries.reduce((s, i) => s + i.gross, 0);
-  const totalNet = salesTimeSeries.reduce((s, i) => s + i.net, 0);
-  const totalOrdersCount = salesTimeSeries.reduce((s, i) => s + i.orders, 0);
-  const avgOrderValue = totalOrdersCount > 0 ? totalGross / totalOrdersCount : 0;
+  const noData = (text: string) => (
+    <div className="p-8 text-center text-xs text-slate-400">{loading ? 'Loading...' : text}</div>
+  );
 
   return (
     <div className="space-y-6">
@@ -101,7 +155,8 @@ export function ReportsPage() {
             Analytics & Reports
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Evaluate revenue velocity, top grossing categories, customer cohorts and order health.
+            Revenue, top categories and products, and your best customers, from completed and
+            processing orders.
           </p>
         </div>
 
@@ -114,7 +169,7 @@ export function ReportsPage() {
             <SelectContent>
               <SelectItem value="7d">Last 7 Days</SelectItem>
               <SelectItem value="30d">Last 30 Days</SelectItem>
-              <SelectItem value="90d">Last Quarter</SelectItem>
+              <SelectItem value="90d">Last 90 Days</SelectItem>
               <SelectItem value="ytd">Year to Date</SelectItem>
             </SelectContent>
           </Select>
@@ -141,13 +196,12 @@ export function ReportsPage() {
             Product & Categories
           </TabsTrigger>
           <TabsTrigger value="customers" className="text-xs">
-            Customer Trends
+            Top Customers
           </TabsTrigger>
         </TabsList>
 
         {/* Sales Performance Tab */}
         <TabsContent value="sales" className="space-y-6 mt-0">
-          {/* KPI Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardContent className="p-5">
@@ -155,10 +209,10 @@ export function ReportsPage() {
                   Gross Sales
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {formatCurrency(totalGross)}
+                  {formatCurrency(totals?.gross_sales ?? 0)}
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 text-xs text-emerald-600 font-medium">
-                  <TrendingUp className="h-3.5 w-3.5" /> +16.4% growth
+                <div className="text-xs text-slate-400 mt-1">
+                  {totals?.items_sold ?? 0} items sold
                 </div>
               </CardContent>
             </Card>
@@ -169,11 +223,9 @@ export function ReportsPage() {
                   Net Sales
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {formatCurrency(totalNet)}
+                  {formatCurrency(totals?.net_sales ?? 0)}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  After taxes & discounts
-                </div>
+                <div className="text-xs text-slate-400 mt-1">Gross minus shipping & tax</div>
               </CardContent>
             </Card>
 
@@ -182,11 +234,9 @@ export function ReportsPage() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Orders Placed
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {totalOrdersCount}
-                </div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">{totals?.orders ?? 0}</div>
                 <div className="text-xs text-slate-400 mt-1">
-                  98.2% checkout conversion
+                  {formatCurrency(totals?.discounts ?? 0)} in discounts
                 </div>
               </CardContent>
             </Card>
@@ -197,46 +247,41 @@ export function ReportsPage() {
                   Avg. Order Value (AOV)
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {formatCurrency(avgOrderValue)}
+                  {formatCurrency(totals?.average_order_value ?? 0)}
                 </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Per completed transaction
-                </div>
+                <div className="text-xs text-slate-400 mt-1">Per order</div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Bar Chart Gross vs Net */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold text-slate-900">
-                Gross vs Net Revenue by Week
+                Gross vs Net Revenue
               </CardTitle>
               <CardDescription className="text-xs">
-                Weekly comparison of top-line merchandise volume vs settled earnings
+                Grouped by {sales?.group_by ?? 'day'}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={salesTimeSeries}
-                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 11 }} />
-                    <YAxis
-                      tick={{ fill: '#64748b', fontSize: 11 }}
-                      tickFormatter={(v) => `₹${v}`}
-                    />
-                    <Tooltip
-                      formatter={(val: number) => formatCurrency(val)}
-                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                    />
-                    <Bar dataKey="gross" name="Gross Sales" fill="#8A1538" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="net" name="Net Sales" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {!hasSales ? (
+                  <EmptyChart text={loading ? 'Loading...' : 'No sales in this period'} />
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={salesSeries} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="period" tick={{ fill: '#64748b', fontSize: 11 }} />
+                      <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+                      <Tooltip
+                        formatter={(val: number) => formatCurrency(val)}
+                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                      />
+                      <Bar dataKey="gross" name="Gross Sales" fill="#8A1538" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="net" name="Net Sales" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -245,120 +290,144 @@ export function ReportsPage() {
         {/* Product & Category Tab */}
         <TabsContent value="products" className="space-y-6 mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Category Performance Chart */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">
-                  Revenue by Department
-                </CardTitle>
+                <CardTitle className="text-base font-semibold">Revenue by Category</CardTitle>
                 <CardDescription className="text-xs">
-                  Sales breakdown across primary store categories
+                  Sales across your product categories
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="h-[280px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={categoryPerformance}
-                      layout="vertical"
-                      margin={{ top: 0, right: 20, left: 30, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" tickFormatter={(v) => `₹${v}`} tick={{ fontSize: 11 }} />
-                      <YAxis
-                        type="category"
-                        dataKey="category"
-                        tick={{ fontSize: 11 }}
-                      />
-                      <Tooltip formatter={(val: number) => formatCurrency(val)} />
-                      <Bar dataKey="revenue" fill="#8A1538" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {categories.length === 0 ? (
+                    <EmptyChart text={loading ? 'Loading...' : 'No category sales in this period'} />
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={categories}
+                        layout="vertical"
+                        margin={{ top: 0, right: 20, left: 30, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                        <XAxis type="number" tick={{ fontSize: 11 }} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(val: number) => formatCurrency(val)} />
+                        <Bar dataKey="revenue" name="Revenue" fill="#8A1538" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Category Table */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">
-                  Department Breakdown
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Units shipped and net sales volume
-                </CardDescription>
+                <CardTitle className="text-base font-semibold">Category Breakdown</CardTitle>
+                <CardDescription className="text-xs">Units sold and revenue</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
+                {categories.length === 0 ? (
+                  noData('No category sales in this period')
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-center">Units Sold</TableHead>
+                        <TableHead className="text-right">Revenue</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {categories.map((c) => (
+                        <TableRow key={c.category_woo_id}>
+                          <TableCell className="font-semibold text-slate-800">{c.name}</TableCell>
+                          <TableCell className="text-center text-xs">{c.units} units</TableCell>
+                          <TableCell className="text-right font-bold text-slate-900">
+                            {formatCurrency(c.revenue)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Top Products</CardTitle>
+              <CardDescription className="text-xs">By revenue in this period</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {products.length === 0 ? (
+                noData('No product sales in this period')
+              ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Category</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-center">Orders</TableHead>
                       <TableHead className="text-center">Units Sold</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {categoryPerformance.map((c) => (
-                      <TableRow key={c.category}>
-                        <TableCell className="font-semibold text-slate-800">
-                          {c.category}
-                        </TableCell>
-                        <TableCell className="text-center text-xs">
-                          {c.units} units
-                        </TableCell>
+                    {products.map((p) => (
+                      <TableRow key={p.product_woo_id}>
+                        <TableCell className="font-semibold text-slate-800">{p.name}</TableCell>
+                        <TableCell className="text-center text-xs">{p.orders}</TableCell>
+                        <TableCell className="text-center text-xs">{p.units}</TableCell>
                         <TableCell className="text-right font-bold text-slate-900">
-                          {formatCurrency(c.revenue)}
+                          {formatCurrency(p.revenue)}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* Customer Trends Tab */}
+        {/* Top Customers Tab */}
         <TabsContent value="customers" className="space-y-6 mt-0">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">
-                New vs Returning Customers
-              </CardTitle>
+              <CardTitle className="text-base font-semibold">Top Customers</CardTitle>
               <CardDescription className="text-xs">
-                Monthly customer acquisition and repeat buyer retention rates
+                Highest spenders in this period, matched by billing e-mail
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-4">
-              <div className="h-[280px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={customerCohorts}
-                    margin={{ top: 10, right: 20, left: -10, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="newUsers"
-                      name="New Customers"
-                      stroke="#DC2626"
-                      strokeWidth={2.5}
-                      dot={{ r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="returning"
-                      name="Returning Buyers"
-                      stroke="#2563EB"
-                      strokeWidth={2.5}
-                      dot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            <CardContent className="p-0">
+              {customers.length === 0 ? (
+                noData('No customer orders in this period')
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="text-center">Orders</TableHead>
+                      <TableHead>Last Order</TableHead>
+                      <TableHead className="text-right">Total Spent</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {customers.map((c) => (
+                      <TableRow key={c.email}>
+                        <TableCell className="font-semibold text-slate-800">{c.name || '-'}</TableCell>
+                        <TableCell className="text-xs text-slate-600">{c.email}</TableCell>
+                        <TableCell className="text-center text-xs">{c.orders}</TableCell>
+                        <TableCell className="text-xs text-slate-500">{formatDate(c.last_order_at)}</TableCell>
+                        <TableCell className="text-right font-bold text-slate-900">
+                          {formatCurrency(c.total_spent)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -366,4 +435,3 @@ export function ReportsPage() {
     </div>
   );
 }
-

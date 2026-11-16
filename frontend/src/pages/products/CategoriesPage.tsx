@@ -23,11 +23,11 @@ import {
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useCategoryStore } from '@/store';
-import { ProductCategory } from '@/types';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function CategoriesPage() {
-  const { categories, isLoading, fetchCategories, addCategory, setCategories } = useCategoryStore();
+  const { categories, isLoading, fetchCategories, createCategory, deleteCategory } = useCategoryStore();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
@@ -44,13 +44,13 @@ export function CategoriesPage() {
     setRefreshing(true);
     try {
       await fetchCategories();
-      toast.success('Categories synced from WooCommerce API.');
+      toast.success('Categories synced from WooCommerce.');
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleAddCategory = (e: React.FormEvent) => {
+  const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       toast.error('Category name is required.');
@@ -59,28 +59,32 @@ export function CategoriesPage() {
 
     const newSlug = slug.trim()
       ? slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
-      : name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      : undefined;
 
-    const newCategory: ProductCategory = {
-      id: `cat-${Date.now()}`,
-      name: name.trim(),
-      slug: newSlug,
-      description: description.trim(),
-      count: 0,
-      image: imageUrl.trim() || undefined,
-    };
-
-    addCategory(newCategory);
-    setName('');
-    setSlug('');
-    setDescription('');
-    setImageUrl('');
-    toast.success(`Category "${newCategory.name}" added successfully.`);
+    try {
+      await createCategory({
+        name: name.trim(),
+        slug: newSlug,
+        description: description.trim() || undefined,
+        image: imageUrl.trim() || undefined,
+      });
+      toast.success(`Category "${name.trim()}" added successfully.`);
+      setName('');
+      setSlug('');
+      setDescription('');
+      setImageUrl('');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
-  const handleDeleteCategory = (id: string, catName: string) => {
-    setCategories(categories.filter((c) => c.id !== id));
-    toast.success(`Category "${catName}" removed.`);
+  const handleDeleteCategory = async (id: string, catName: string) => {
+    try {
+      await deleteCategory(id);
+      toast.success(`Category "${catName}" removed.`);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Truck,
   Plus,
@@ -30,35 +30,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useShippingStore, useSettingsStore } from '@/store';
+import { useShippingStore } from '@/store';
 import { ShippingMethod } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function ShippingPage() {
-  const { shippingZones, updateShippingMethod, addShippingMethod, deleteShippingMethod } =
-    useShippingStore();
-  const { settings, updateSettings } = useSettingsStore();
+  const {
+    shippingZones,
+    isLoading,
+    fetchShipping,
+    updateShippingMethod,
+    addShippingMethod,
+    deleteShippingMethod,
+  } = useShippingStore();
 
-  const [selectedZoneId, setSelectedZoneId] = useState<string>(shippingZones[0]?.id || 'zone-1');
+  const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [methodModalOpen, setMethodModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<ShippingMethod | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Form state
-  const [methodType, setMethodType] = useState<'flat_rate' | 'free_shipping' | 'local_pickup'>(
-    'flat_rate'
-  );
+  const [methodType, setMethodType] = useState<string>('flat_rate');
   const [methodTitle, setMethodTitle] = useState('');
-  const [methodCost, setMethodCost] = useState<number>(10);
+  const [methodCost, setMethodCost] = useState<number>(0);
   const [taxStatus, setTaxStatus] = useState<'taxable' | 'none'>('taxable');
+
+  useEffect(() => {
+    fetchShipping();
+  }, [fetchShipping]);
 
   const currentZone = shippingZones.find((z) => z.id === selectedZoneId) || shippingZones[0];
 
   const openAddMethodModal = () => {
     setEditingMethod(null);
     setMethodType('flat_rate');
-    setMethodTitle('Standard Ground');
-    setMethodCost(12);
+    setMethodTitle('');
+    setMethodCost(0);
     setTaxStatus('taxable');
     setMethodModalOpen(true);
   };
@@ -67,42 +76,84 @@ export function ShippingPage() {
     setEditingMethod(m);
     setMethodType(m.type);
     setMethodTitle(m.title);
-    setMethodCost(m.cost);
+    setMethodCost(m.cost ?? 0);
     setTaxStatus(m.taxStatus);
     setMethodModalOpen(true);
   };
 
-  const handleSaveMethod = () => {
+  const handleSaveMethod = async () => {
+    if (!currentZone) return;
     if (!methodTitle.trim()) {
       toast.error('Title is required.');
       return;
     }
 
-    if (editingMethod) {
-      updateShippingMethod(currentZone.id, editingMethod.id, {
-        title: methodTitle.trim(),
-        type: methodType,
-        cost: methodType === 'free_shipping' || methodType === 'local_pickup' ? 0 : methodCost,
-        taxStatus,
-      });
-      toast.success(`Shipping method "${methodTitle}" updated.`);
-    } else {
-      addShippingMethod(currentZone.id, {
-        title: methodTitle.trim(),
-        type: methodType,
-        cost: methodType === 'free_shipping' || methodType === 'local_pickup' ? 0 : methodCost,
-        enabled: true,
-        taxStatus,
-      });
-      toast.success(`Shipping method "${methodTitle}" added.`);
+    setSaving(true);
+    try {
+      if (editingMethod) {
+        await updateShippingMethod(currentZone.id, editingMethod.id, {
+          title: methodTitle.trim(),
+          cost: editingMethod.type === 'flat_rate' ? methodCost : undefined,
+          taxStatus,
+        });
+        toast.success(`Shipping method "${methodTitle}" updated.`);
+      } else {
+        await addShippingMethod(currentZone.id, {
+          title: methodTitle.trim(),
+          type: methodType,
+          cost: methodCost,
+          enabled: true,
+          taxStatus,
+        });
+        toast.success(`Shipping method "${methodTitle}" added.`);
+      }
+      setMethodModalOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    } finally {
+      setSaving(false);
     }
-    setMethodModalOpen(false);
   };
 
-  const handleDeleteMethod = (mId: string, title: string) => {
-    deleteShippingMethod(currentZone.id, mId);
-    toast.success(`Method "${title}" removed.`);
+  const handleToggleMethod = async (method: ShippingMethod, checked: boolean) => {
+    if (!currentZone) return;
+    try {
+      await updateShippingMethod(currentZone.id, method.id, { enabled: checked });
+      toast.success(`${method.title} is now ${checked ? 'enabled' : 'disabled'}.`);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
+
+  const handleDeleteMethod = async (mId: string, title: string) => {
+    if (!currentZone) return;
+    try {
+      await deleteShippingMethod(currentZone.id, mId);
+      toast.success(`Method "${title}" removed.`);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
+  if (!currentZone) {
+    return (
+      <div className="space-y-6 w-full pb-12">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            Shipping Zones & Methods
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Fulfillment regions and shipping methods from your WooCommerce store.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="p-10 text-center text-sm text-slate-400">
+            {isLoading ? 'Loading shipping zones...' : 'No shipping zones found.'}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full pb-12">
@@ -112,7 +163,7 @@ export function ShippingPage() {
           Shipping Zones & Methods
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Configure fulfillment regions, rates, carrier classes, and checkout freight calculations.
+          Fulfillment regions and shipping methods from your WooCommerce store.
         </p>
       </div>
 
@@ -154,40 +205,6 @@ export function ShippingPage() {
                   </button>
                 );
               })}
-            </CardContent>
-          </Card>
-
-          {/* General Shipping Options */}
-          <Card>
-            <CardHeader className="pb-3 border-b border-slate-100">
-              <CardTitle className="text-sm font-semibold">General Shipping Rules</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4 text-xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-slate-800">Shipping Calculator</div>
-                  <div className="text-slate-400">Show calculator on cart page</div>
-                </div>
-                <Switch
-                  checked={settings.shipping.shippingCalculations}
-                  onCheckedChange={(val) =>
-                    updateSettings('shipping', { shippingCalculations: val })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                <div>
-                  <div className="font-semibold text-slate-800">Enable Freight</div>
-                  <div className="text-slate-400">Calculate shipping costs at checkout</div>
-                </div>
-                <Switch
-                  checked={settings.shipping.enableShipping}
-                  onCheckedChange={(val) =>
-                    updateSettings('shipping', { enableShipping: val })
-                  }
-                />
-              </div>
             </CardContent>
           </Card>
         </div>
@@ -236,7 +253,7 @@ export function ShippingPage() {
                           <div className="text-xs text-slate-400 mt-0.5">
                             Type:{' '}
                             <span className="capitalize font-medium text-slate-600">
-                              {method.type.replace('_', ' ')}
+                              {method.type.replace(/_/g, ' ')}
                             </span>{' '}
                             • Tax:{' '}
                             <span className="capitalize text-slate-600">
@@ -249,21 +266,14 @@ export function ShippingPage() {
                       <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
                         <div className="text-left sm:text-right">
                           <div className="text-sm font-bold text-slate-900">
-                            {method.cost === 0 ? 'Free' : formatCurrency(method.cost)}
+                            {method.type === 'free_shipping' ? 'Free' : method.cost === null ? '-' : formatCurrency(method.cost)}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={method.enabled}
-                            onCheckedChange={(checked) => {
-                              updateShippingMethod(currentZone.id, method.id, {
-                                enabled: checked,
-                              });
-                              toast.success(
-                                `${method.title} is now ${checked ? 'enabled' : 'disabled'}.`
-                              );
-                            }}
+                            onCheckedChange={(checked) => handleToggleMethod(method, checked)}
                           />
 
                           <Button
@@ -311,11 +321,8 @@ export function ShippingPage() {
               <label className="font-semibold text-slate-700">Method Type</label>
               <Select
                 value={methodType}
-                onValueChange={(val: any) => {
-                  setMethodType(val);
-                  if (val === 'free_shipping') setMethodTitle('Free Shipping');
-                  if (val === 'local_pickup') setMethodTitle('Local Pickup');
-                }}
+                disabled={Boolean(editingMethod)}
+                onValueChange={(val: string) => setMethodType(val)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -380,6 +387,7 @@ export function ShippingPage() {
             <Button
               size="sm"
               onClick={handleSaveMethod}
+              disabled={saving}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Save Method

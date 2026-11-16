@@ -5,7 +5,6 @@ namespace App\Services\WooCommerce;
 use Generator;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 
 /**
  * Read-only WooCommerce REST client.
@@ -22,7 +21,7 @@ final class WooClient
         $base = config('woocommerce.base_url');
 
         if (! $key || ! $secret || ! $base) {
-            throw new RuntimeException('WooCommerce credentials are not configured (WOO_BASE_URL, WOO_CONSUMER_KEY, WOO_CONSUMER_SECRET).');
+            throw new WooNotConfigured('WooCommerce credentials are not configured (WOO_BASE_URL, WOO_CONSUMER_KEY, WOO_CONSUMER_SECRET).');
         }
 
         $caBundle = config('woocommerce.ca_bundle');

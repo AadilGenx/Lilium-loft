@@ -17,5 +17,11 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Customers')]
 #[OA\Tag(name: 'Categories')]
 #[OA\Tag(name: 'Coupons')]
-#[OA\Tag(name: 'Sync', description: 'Status of the WooCommerce to local mirror import')]
+#[OA\Tag(name: 'Shipping', description: 'Zones, methods and classes, read live from WooCommerce (cached)')]
+#[OA\Tag(name: 'Settings', description: 'Store settings, read live from WooCommerce (cached, secrets masked)')]
+#[OA\Tag(name: 'Payments', description: 'Payment gateway configuration, read live from WooCommerce (cached, credentials masked)')]
+#[OA\Tag(name: 'Notifications', description: 'Header bell alerts computed from the local mirror')]
+#[OA\Tag(name: 'Reports', description: 'Sales, product, category, customer, coupon and stock reports from the local mirror')]
+#[OA\Tag(name: 'Webhooks', description: 'Called by WooCommerce to push changes instantly (signature-verified, no JWT)')]
+#[OA\Tag(name: 'Sync',description: 'Status of the WooCommerce to local mirror import')]
 final class ApiInfo {}

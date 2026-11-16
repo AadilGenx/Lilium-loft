@@ -40,4 +40,16 @@ class WooOrder extends Model
     {
         return $this->belongsTo(WooCustomer::class, 'customer_woo_id', 'woo_id');
     }
+
+    public const DETAIL_ATTRS = ['billing', 'shipping'];
+
+    public function getBillingAttribute(): array
+    {
+        return $this->raw['billing'] ?? [];
+    }
+
+    public function getShippingAttribute(): array
+    {
+        return $this->raw['shipping'] ?? [];
+    }
 }

@@ -1,19 +1,23 @@
 import { z } from 'zod';
 
+// An empty number input means "not set", not zero.
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || Number.isNaN(v) ? undefined : v),
+  z.coerce.number().min(0, 'Must be 0 or more').optional()
+);
+
 export const productSchema = z.object({
   name: z.string().min(2, 'Product name is required'),
-  slug: z.string().min(2, 'Slug is required'),
-  sku: z.string().min(1, 'SKU is required'),
-  type: z.enum(['simple', 'variable']),
-  status: z.enum(['publish', 'draft', 'pending']),
-  price: z.coerce.number().min(0, 'Price must be greater than or equal to 0'),
-  regularPrice: z.coerce.number().min(0, 'Regular price is required'),
-  salePrice: z.coerce.number().optional(),
-  manageStock: z.boolean().default(true),
-  stockQuantity: z.coerce.number().int().min(0, 'Stock quantity cannot be negative'),
+  slug: z.string().regex(/^[a-z0-9-]*$/, 'Use lowercase letters, numbers and dashes').default(''),
+  sku: z.string().default(''),
+  type: z.enum(['simple', 'variable', 'grouped', 'external']),
+  status: z.enum(['publish', 'draft', 'pending', 'private']),
+  regularPrice: optionalNumber,
+  salePrice: optionalNumber,
+  manageStock: z.boolean().default(false),
+  stockQuantity: z.coerce.number().int().min(0, 'Stock quantity cannot be negative').default(0),
   stockStatus: z.enum(['instock', 'outofstock', 'onbackorder']),
-  categories: z.array(z.string()).min(1, 'Select at least one category'),
-  tags: z.array(z.string()).default([]),
+  categories: z.array(z.string()).default([]),
   shortDescription: z.string().default(''),
   description: z.string().default(''),
 });

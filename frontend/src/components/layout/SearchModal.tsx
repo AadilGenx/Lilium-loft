@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useUIStore, useProductStore, useOrderStore, useCustomerStore } from '@/store';
 import { Search, Package, ShoppingCart, Users, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
+import { initials } from '@/utils/initials';
 
 export function SearchModal() {
   const { searchOpen, setSearchOpen } = useUIStore();
@@ -182,11 +183,7 @@ export function SearchModal() {
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="h-8 w-8 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                        <img
-                          src={c.avatarUrl}
-                          alt={c.firstName}
-                          className="h-full w-full object-cover"
-                        />
+                        <span className="h-full w-full flex items-center justify-center text-xs font-semibold text-slate-600">{initials(c.firstName, c.lastName)}</span>
                       </div>
                       <div>
                         <div className="text-sm font-medium text-slate-800 group-hover:text-red-600 transition-colors">

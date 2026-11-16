@@ -68,8 +68,8 @@ export function Sidebar() {
     }
   };
 
-  const displayName = currentUser?.name || 'Admin User';
-  const displayEmail = currentUser?.email || 'admin@liliumloft.com';
+  const displayName = currentUser?.name ?? '';
+  const displayEmail = currentUser?.email ?? '';
   const initials = displayName
     .split(' ')
     .map((n) => n[0])

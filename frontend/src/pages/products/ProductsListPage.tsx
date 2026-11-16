@@ -47,6 +47,8 @@ import { useProductStore } from '@/store';
 import { Product } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
+import { stockState } from '@/utils/stock';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function ProductsListPage() {
@@ -82,9 +84,9 @@ export function ProductsListPage() {
 
       const matchesStock =
         selectedStock === 'all' ||
-        (selectedStock === 'instock' && p.stockStatus === 'instock' && p.stockQuantity > 5) ||
-        (selectedStock === 'lowstock' && p.stockQuantity > 0 && p.stockQuantity <= 5) ||
-        (selectedStock === 'outofstock' && p.stockQuantity === 0);
+        (selectedStock === 'instock' && stockState(p) === 'in') ||
+        (selectedStock === 'lowstock' && stockState(p) === 'low') ||
+        (selectedStock === 'outofstock' && stockState(p) === 'out');
 
       const matchesType = selectedType === 'all' || p.type === selectedType;
 
@@ -98,11 +100,14 @@ export function ProductsListPage() {
     currentPage * pageSize
   );
 
-  const handleDelete = () => {
-    if (productToDelete) {
-      deleteProduct(productToDelete.id);
-      toast.success(`Product "${productToDelete.name}" has been deleted.`);
+  const handleDelete = async () => {
+    if (!productToDelete) return;
+    try {
+      await deleteProduct(productToDelete.id);
+      toast.success(`Product "${productToDelete.name}" moved to the trash.`);
       setProductToDelete(null);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -124,10 +129,11 @@ export function ProductsListPage() {
   };
 
   const getStockBadge = (prod: Product) => {
-    if (prod.stockQuantity === 0) {
+    const state = stockState(prod);
+    if (state === 'out') {
       return <Badge variant="destructive">Out of Stock</Badge>;
     }
-    if (prod.stockQuantity <= 5) {
+    if (state === 'low') {
       return (
         <Badge variant="warning">
           Low Stock ({prod.stockQuantity})
@@ -136,7 +142,7 @@ export function ProductsListPage() {
     }
     return (
       <Badge variant="success">
-        In Stock ({prod.stockQuantity})
+        {prod.manageStock ? `In Stock (${prod.stockQuantity})` : 'In Stock'}
       </Badge>
     );
   };
@@ -150,7 +156,7 @@ export function ProductsListPage() {
             Products
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Manage your store inventory, pricing, variations, and catalog.
+            Manage your store inventory, pricing and catalog.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
@@ -323,7 +329,7 @@ export function ProductsListPage() {
                     <TableCell>
                       {product.type === 'variable' ? (
                         <Badge variant="purple" className="text-[10px]">
-                          Variable ({product.variations.length})
+                          Variable
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="text-[10px]">

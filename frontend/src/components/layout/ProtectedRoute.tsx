@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { getStoredToken, authApi } from '@/services/api';
+import { getStoredToken, authApi, ApiError } from '@/services/api';
 import { useBackendSyncStore } from '@/store';
 import { Loader2 } from 'lucide-react';
 
@@ -26,11 +26,16 @@ export function ProtectedRoute() {
             useBackendSyncStore.setState({ currentUser: user });
             syncAll();
           }
-        } catch {
+        } catch (err) {
           if (isMounted) {
-            // Token expired or invalid
-            authApi.logout();
-            useBackendSyncStore.setState({ currentUser: null, status: 'offline' });
+            if (err instanceof ApiError && err.status === 401) {
+              // Token expired or invalid
+              authApi.logout();
+              useBackendSyncStore.setState({ currentUser: null, status: 'offline' });
+            } else {
+              // Backend unreachable: keep the session, show it as disconnected.
+              useBackendSyncStore.setState({ status: 'offline' });
+            }
           }
         } finally {
           if (isMounted) setChecking(false);

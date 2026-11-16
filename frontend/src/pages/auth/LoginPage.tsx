@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useBackendSyncStore } from '@/store';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function LoginPage() {
@@ -12,8 +13,8 @@ export function LoginPage() {
   const location = useLocation();
   const login = useBackendSyncStore((s) => s.login);
 
-  const [email, setEmail] = useState('admin@liliumloft.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -37,20 +38,15 @@ export function LoginPage() {
         toast.success('Welcome back! Signed in successfully.');
         navigate(from, { replace: true });
       } else {
-        setErrorMessage('Invalid email or password. Please verify your credentials.');
+        setErrorMessage(useBackendSyncStore.getState().errorMessage || 'Invalid email or password. Please verify your credentials.');
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to authenticate with backend server.');
+      setErrorMessage(getErrorMessage(err, 'Could not sign in. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickFill = () => {
-    setEmail('admin@liliumloft.com');
-    setPassword('password');
-    toast.info('Admin demo credentials filled.');
-  };
 
   return (
     <div className="min-h-screen min-h-[100dvh] w-full flex flex-col justify-between items-center bg-gradient-to-br from-slate-50 via-pink-50/20 to-rose-50/40 p-4 sm:p-6 relative overflow-hidden select-none">
@@ -102,7 +98,7 @@ export function LoginPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@liliumloft.com"
+                    placeholder="you@example.com"
                     required
                     disabled={loading}
                     className="pl-9 h-9.5 text-sm border-slate-200 focus:border-red-600 focus:ring-red-600/20"

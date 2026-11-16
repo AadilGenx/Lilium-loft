@@ -44,6 +44,8 @@ import { useProductStore } from '@/store';
 import { Product } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
+import { stockState } from '@/utils/stock';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function InventoryPage() {
@@ -64,9 +66,9 @@ export function InventoryPage() {
   const counts = useMemo(() => {
     return {
       total: products.length,
-      inStock: products.filter((p) => p.stockQuantity > 5).length,
-      lowStock: products.filter((p) => p.stockQuantity > 0 && p.stockQuantity <= 5).length,
-      outOfStock: products.filter((p) => p.stockQuantity === 0).length,
+      inStock: products.filter((p) => stockState(p) === 'in').length,
+      lowStock: products.filter((p) => stockState(p) === 'low').length,
+      outOfStock: products.filter((p) => stockState(p) === 'out').length,
     };
   }, [products]);
 
@@ -78,9 +80,9 @@ export function InventoryPage() {
         p.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
       let matchesTab = true;
-      if (filterTab === 'low') matchesTab = p.stockQuantity > 0 && p.stockQuantity <= 5;
-      if (filterTab === 'out') matchesTab = p.stockQuantity === 0;
-      if (filterTab === 'in') matchesTab = p.stockQuantity > 5;
+      if (filterTab === 'low') matchesTab = stockState(p) === 'low';
+      if (filterTab === 'out') matchesTab = stockState(p) === 'out';
+      if (filterTab === 'in') matchesTab = stockState(p) === 'in';
 
       return matchesSearch && matchesTab;
     });
@@ -99,14 +101,19 @@ export function InventoryPage() {
     setAdjustNote('');
   };
 
-  const handleApplyAdjustment = () => {
+  const handleApplyAdjustment = async () => {
     if (!selectedProduct) return;
     if (adjustAmount < 0) {
       toast.error('Adjustment amount cannot be negative.');
       return;
     }
 
-    adjustStock(selectedProduct.id, adjustAmount, adjustType);
+    try {
+      await adjustStock(selectedProduct.id, adjustAmount, adjustType);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+      return;
+    }
 
     const actionText =
       adjustType === 'set'
@@ -301,8 +308,8 @@ export function InventoryPage() {
               </TableHeader>
               <TableBody>
                 {paginatedProducts.map((p) => {
-                  const isOut = p.stockQuantity === 0;
-                  const isLow = p.stockQuantity > 0 && p.stockQuantity <= 5;
+                  const isOut = stockState(p) === 'out';
+                  const isLow = stockState(p) === 'low';
                   return (
                     <TableRow key={p.id}>
                       <TableCell>
@@ -340,7 +347,7 @@ export function InventoryPage() {
                               : 'text-slate-900'
                           }`}
                         >
-                          {p.stockQuantity} units
+                          {p.manageStock ? `${p.stockQuantity} units` : 'Not tracked'}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -393,7 +400,7 @@ export function InventoryPage() {
                 <span>Adjust Stock: {selectedProduct.name}</span>
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Current stock on hand: <strong className="text-slate-800">{selectedProduct.stockQuantity} units</strong> (SKU: {selectedProduct.sku})
+                Current stock on hand: <strong className="text-slate-800">{selectedProduct.manageStock ? `${selectedProduct.stockQuantity} units` : 'not tracked'}</strong> (SKU: {selectedProduct.sku})
               </DialogDescription>
             </DialogHeader>
 

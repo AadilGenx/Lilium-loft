@@ -25,6 +25,8 @@ import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useProductStore, useOrderStore } from '@/store';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { stockState } from '@/utils/stock';
+import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
 export function ProductDetailPage() {
@@ -59,24 +61,32 @@ export function ProductDetailPage() {
 
   // Calculate product sales from orders
   const relatedOrders = orders.filter((o) =>
-    o.items.some((item) => item.productId === product.id)
+    o.items.some((item) => item.productId === String(product.wooId))
   );
   const totalUnitsSold = relatedOrders.reduce((sum, o) => {
-    const item = o.items.find((i) => i.productId === product.id);
+    const item = o.items.find((i) => i.productId === String(product.wooId));
     return sum + (item ? item.quantity : 0);
   }, 0);
   const totalRevenue = totalUnitsSold * product.price;
 
-  const handleDelete = () => {
-    deleteProduct(product.id);
-    toast.success(`Product "${product.name}" deleted.`);
-    navigate('/products');
+  const handleDelete = async () => {
+    try {
+      await deleteProduct(product.id);
+      toast.success(`Product "${product.name}" moved to the trash.`);
+      navigate('/products');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
-  const handleStockUpdate = () => {
-    adjustStock(product.id, Number(stockInput), 'set');
-    toast.success(`Stock level updated to ${stockInput} units.`);
-    setStockModalOpen(false);
+  const handleStockUpdate = async () => {
+    try {
+      await adjustStock(product.id, Number(stockInput), 'set');
+      toast.success(`Stock level updated to ${stockInput} units.`);
+      setStockModalOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
   const handleCopyLink = () => {
@@ -84,8 +94,9 @@ export function ProductDetailPage() {
     toast.success('Product link copied to clipboard.');
   };
 
-  const isLowStock = product.stockQuantity > 0 && product.stockQuantity <= 5;
-  const isOutOfStock = product.stockQuantity === 0;
+  const stock = stockState(product);
+  const isLowStock = stock === 'low';
+  const isOutOfStock = stock === 'out';
 
   return (
     <div className="space-y-6 w-full pb-16">
@@ -115,7 +126,7 @@ export function ProductDetailPage() {
               )}
               {product.type === 'variable' && (
                 <Badge variant="purple" className="text-xs">
-                  Variable ({product.variations.length})
+                  Variable
                 </Badge>
               )}
             </div>
@@ -208,11 +219,13 @@ export function ProductDetailPage() {
             </div>
             <div className="mt-1 flex items-center gap-2">
               {isOutOfStock ? (
-                <Badge variant="destructive">0 Units (Out of Stock)</Badge>
+                <Badge variant="destructive">Out of Stock</Badge>
               ) : isLowStock ? (
                 <Badge variant="warning">Low Stock ({product.stockQuantity} left)</Badge>
-              ) : (
+              ) : product.manageStock ? (
                 <Badge variant="success">In Stock ({product.stockQuantity} units)</Badge>
+              ) : (
+                <Badge variant="success">In Stock</Badge>
               )}
             </div>
             <span className="text-[11px] text-slate-400 block mt-1">
