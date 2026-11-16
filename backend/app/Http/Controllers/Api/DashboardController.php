@@ -37,6 +37,7 @@ class DashboardController extends Controller
                 new OA\Property(property: 'average_order_value', type: 'number', format: 'float', example: 1303.61),
                 new OA\Property(property: 'awaiting_fulfilment', type: 'integer', description: 'processing + on-hold + pending orders (all time)', example: 3),
                 new OA\Property(property: 'customers', type: 'integer', example: 1),
+                new OA\Property(property: 'currency', type: 'string', nullable: true, example: 'INR', description: 'ISO currency code of the most recent order; null when there are no orders'),
                 new OA\Property(property: 'published_products', type: 'integer', example: 95),
                 new OA\Property(property: 'out_of_stock_products', type: 'integer', example: 4),
             ])),
@@ -63,6 +64,8 @@ class DashboardController extends Controller
             'average_order_value' => $orders ? round($revenue / $orders, 2) : 0,
             'awaiting_fulfilment' => WooOrder::whereIn('status', ['processing', 'on-hold', 'pending'])->count(),
             'customers' => WooCustomer::count(),
+            // The store's currency, as used by its most recent order. null when there are no orders yet.
+            'currency' => WooOrder::whereNotNull('currency')->orderByDesc('woo_created_at')->orderByDesc('id')->value('currency'),
             'published_products' => WooProduct::where('status', 'publish')->count(),
             'out_of_stock_products' => WooProduct::where('status', 'publish')->where('stock_status', 'outofstock')->count(),
         ]);

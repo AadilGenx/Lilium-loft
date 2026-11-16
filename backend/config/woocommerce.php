@@ -16,9 +16,4 @@ return [
 
     // Products at or below this stock level count as "low stock".
     'low_stock_threshold' => (int) env('WOO_LOW_STOCK_THRESHOLD', 5),
-
-    // Hard, environment-level kill switch for ANY request that changes WooCommerce.
-    // Must be explicitly set to true in .env; defaults to false so a fresh or
-    // production deploy can never write by accident, whatever the DB settings say.
-    'writes_allowed' => (bool) env('WOO_WRITES_ALLOWED', false),
 ];

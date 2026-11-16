@@ -9,6 +9,7 @@ import {
   Mail,
   UserRound,
   Save,
+  ShieldCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useSettingsStore } from '@/store';
+import { StoreChangesPanel } from '@/components/settings/StoreChangesPanel';
 import { BackendSetting } from '@/services/api';
 import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
@@ -44,6 +46,9 @@ const GROUP_ICONS: Record<string, React.ElementType> = {
 type Draft = Record<string, string | boolean>;
 
 const EMPTY = '__empty__';
+
+/** The extra tab that controls whether this panel may change the live store. */
+const STORE_CHANGES = 'store-changes';
 
 /** Settings this page can show and edit. Credentials are never shown. */
 const isEditable = (s: BackendSetting) =>
@@ -70,10 +75,12 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (!activeTab && tabs.length > 0) setActiveTab(tabs[0].id);
-  }, [tabs, activeTab]);
+    // WooCommerce settings could not be loaded (not configured / unreachable): the switches stay reachable.
+    if (!activeTab && tabs.length === 0 && !isLoading && groups.length === 0) setActiveTab(STORE_CHANGES);
+  }, [tabs, activeTab, isLoading, groups.length]);
 
   useEffect(() => {
-    if (activeTab) fetchGroup(activeTab);
+    if (activeTab && activeTab !== STORE_CHANGES) fetchGroup(activeTab);
   }, [activeTab, fetchGroup]);
 
   const setField = (groupId: string, settingId: string, value: string | boolean) =>
@@ -180,14 +187,7 @@ export function SettingsPage() {
         </p>
       </div>
 
-      {tabs.length === 0 ? (
-        <Card>
-          <CardContent className="p-10 text-center text-sm text-slate-400">
-            {isLoading ? 'Loading settings...' : 'No settings available.'}
-          </CardContent>
-        </Card>
-      ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab || STORE_CHANGES} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-slate-100 p-1 flex-wrap h-auto gap-1">
             {tabs.map((g) => {
               const Icon = GROUP_ICONS[g.id] ?? Settings;
@@ -198,7 +198,15 @@ export function SettingsPage() {
                 </TabsTrigger>
               );
             })}
+            <TabsTrigger value={STORE_CHANGES} className="gap-1.5 text-xs">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Store changes</span>
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value={STORE_CHANGES} className="mt-0">
+            <StoreChangesPanel />
+          </TabsContent>
 
           {tabs.map((g) => {
             const rows = (settings[g.id] ?? []).filter(isEditable);
@@ -253,8 +261,7 @@ export function SettingsPage() {
               </TabsContent>
             );
           })}
-        </Tabs>
-      )}
+      </Tabs>
     </div>
   );
 }

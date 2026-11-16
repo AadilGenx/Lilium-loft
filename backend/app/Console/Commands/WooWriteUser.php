@@ -25,7 +25,7 @@ class WooWriteUser extends Command
         $user->save();
 
         $this->info(($user->can_write ? 'Granted' : 'Revoked')." write permission for {$user->email}.");
-        $this->line('Writes still stay blocked until WOO_WRITES_ALLOWED=true and the switches are turned on.');
+        $this->line('Changes to the store still stay blocked until the master switch and the specific action switch are turned on in Settings.');
 
         return self::SUCCESS;
     }

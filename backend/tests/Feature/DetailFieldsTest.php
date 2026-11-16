@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\WooCoupon;
 use App\Models\WooCustomer;
 use App\Models\WooOrder;
+use App\Models\WooOrderItem;
 use App\Models\WooProduct;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -72,5 +73,39 @@ class DetailFieldsTest extends TestCase
         $p = WooProduct::create(['woo_id' => 9, 'name' => 'X', 'slug' => 'x', 'type' => 'simple', 'status' => 'publish', 'stock_status' => 'instock', 'raw' => ['secret_meta' => 'no']]);
 
         $this->assertArrayNotHasKey('raw', $this->getJson("/api/v1/products/{$p->id}")->json());
+    }
+
+    public function test_product_revenue_counts_only_paid_orders_and_is_zero_for_a_product_nobody_bought(): void
+    {
+        $sold = WooProduct::create(['woo_id' => 20, 'name' => 'Sold', 'slug' => 'sold', 'type' => 'simple', 'status' => 'publish', 'stock_status' => 'instock', 'total_sales' => 3]);
+        $new = WooProduct::create(['woo_id' => 21, 'name' => 'Brand new private', 'slug' => 'new', 'type' => 'simple', 'status' => 'private', 'stock_status' => 'instock']);
+
+        foreach ([[1, 'completed', '100.00'], [2, 'processing', '50.50'], [3, 'cancelled', '999.00'], [4, 'pending', '777.00']] as [$id, $status, $total]) {
+            WooOrder::create(['woo_id' => $id, 'number' => (string) $id, 'status' => $status, 'currency' => 'INR', 'total' => $total]);
+            WooOrderItem::create(['order_woo_id' => $id, 'woo_item_id' => $id, 'product_woo_id' => 20, 'name' => 'Sold', 'quantity' => 1, 'total' => $total]);
+        }
+
+        $this->getJson("/api/v1/products/{$sold->id}")->assertOk()
+            ->assertJsonPath('revenue', 150.5)   // completed + processing only
+            ->assertJsonPath('total_sales', 3);
+
+        $this->getJson("/api/v1/products/{$new->id}")->assertOk()
+            ->assertJsonPath('revenue', 0)
+            ->assertJsonPath('total_sales', 0);
+
+        $list = collect($this->getJson('/api/v1/products')->assertOk()->json('data'))->keyBy('woo_id');
+        $this->assertSame(150.5, $list[20]['revenue']);
+        $this->assertSame(0, $list[21]['revenue']);
+    }
+
+    public function test_dashboard_reports_the_store_currency_from_its_latest_order_and_null_when_unknown(): void
+    {
+        // No orders yet: the app must not be told a currency it cannot know.
+        $this->getJson('/api/v1/dashboard/summary')->assertOk()->assertJsonPath('currency', null);
+
+        WooOrder::create(['woo_id' => 1, 'number' => '1', 'status' => 'completed', 'currency' => 'EUR', 'total' => '5', 'woo_created_at' => now()->subDays(2)]);
+        WooOrder::create(['woo_id' => 2, 'number' => '2', 'status' => 'completed', 'currency' => 'USD', 'total' => '5', 'woo_created_at' => now()->subDay()]);
+
+        $this->getJson('/api/v1/dashboard/summary')->assertOk()->assertJsonPath('currency', 'USD');
     }
 }

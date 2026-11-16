@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\WooCommerce\MirrorVersion;
 use App\Services\WooCommerce\WooErrors;
 use App\Services\WooCommerce\WooSyncService;
 use Illuminate\Http\JsonResponse;
@@ -71,5 +72,28 @@ class SyncController extends Controller
             'results' => $results,
             'finished_at' => now()->toIso8601String(),
         ]);
+    }
+
+    #[OA\Get(
+        path: '/api/v1/sync/changes',
+        operationId: 'syncChanges',
+        summary: 'Change counters for the mirrored data',
+        description: 'One number per kind of record that goes up every time a record is saved or removed locally (webhook, import or a change made through this API). Poll it cheaply and reload a list only when its number changed. The numbers are only meaningful to compare with a previous value; they can reset (for example after a cache clear), so treat any difference as a change. Reads local data only; WooCommerce is not contacted.',
+        security: [['bearerAuth' => []]],
+        tags: ['Sync'],
+        responses: [
+            new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'products', type: 'integer', example: 12),
+                new OA\Property(property: 'orders', type: 'integer', example: 40),
+                new OA\Property(property: 'customers', type: 'integer', example: 7),
+                new OA\Property(property: 'coupons', type: 'integer', example: 2),
+                new OA\Property(property: 'categories', type: 'integer', example: 5),
+            ])),
+            new OA\Response(response: 401, ref: '#/components/responses/Unauthenticated'),
+        ],
+    )]
+    public function changes(): JsonResponse
+    {
+        return response()->json(MirrorVersion::all());
     }
 }

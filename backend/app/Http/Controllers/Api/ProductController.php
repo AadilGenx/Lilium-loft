@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\WooOrderItem;
 use App\Models\WooProduct;
 use App\Services\WooCommerce\ProductWriteService;
 use App\Services\WooCommerce\WriteFailed;
@@ -55,6 +56,7 @@ class ProductController extends Controller
 
         $page = $q->paginate((int) $request->input('per_page', 20))->withQueryString();
         $page->getCollection()->each->append(WooProduct::DETAIL_ATTRS);
+        $this->addRevenue($page->getCollection());
 
         return response()->json($page);
     }
@@ -74,14 +76,17 @@ class ProductController extends Controller
     )]
     public function show(int $id): JsonResponse
     {
-        return response()->json(WooProduct::with('categories')->findOrFail($id)->append(WooProduct::DETAIL_ATTRS));
+        $product = WooProduct::with('categories')->findOrFail($id)->append(WooProduct::DETAIL_ATTRS);
+        $this->addRevenue(collect([$product]));
+
+        return response()->json($product);
     }
 
     #[OA\Put(
         path: '/api/v1/products/{id}',
         operationId: 'productsUpdatePut',
         summary: 'Update product price and stock',
-        description: 'CHANGES THE LIVE STORE. Sends the change to WooCommerce, then refreshes the local copy from its response. Only available when writes are enabled (environment flag, master switch, the "products.update" switch, and a user with write permission); otherwise returns 403 and nothing is sent. Send only the fields to change; set `sale_price` to an empty string to remove a sale price.',
+        description: 'CHANGES THE LIVE STORE. Sends the change to WooCommerce, then refreshes the local copy from its response. Only available when writes are enabled (the master switch, the "products.update" switch, and a user with write permission, all under Settings → Store changes); otherwise returns 403 and nothing is sent. Send only the fields to change; set `sale_price` to an empty string to remove a sale price.',
         security: [['bearerAuth' => []]],
         tags: ['Products'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'Local product id', schema: new OA\Schema(type: 'integer'))],
@@ -188,5 +193,24 @@ class ProductController extends Controller
         }
 
         return response()->json($updated->load('categories'));
+    }
+
+    /**
+     * Lifetime revenue per product: the line totals of completed and processing orders in the local copy.
+     * (WooCommerce already supplies the units sold as `total_sales`.)
+     *
+     * @param  \Illuminate\Support\Collection<int, WooProduct>  $products
+     */
+    private function addRevenue($products): void
+    {
+        $revenue = WooOrderItem::query()
+            ->join('woo_orders', 'woo_orders.woo_id', '=', 'woo_order_items.order_woo_id')
+            ->whereIn('woo_orders.status', ['completed', 'processing'])
+            ->whereIn('woo_order_items.product_woo_id', $products->pluck('woo_id'))
+            ->selectRaw('woo_order_items.product_woo_id as woo_id, SUM(woo_order_items.total) as revenue')
+            ->groupBy('woo_order_items.product_woo_id')
+            ->pluck('revenue', 'woo_id');
+
+        $products->each(fn (WooProduct $p) => $p->setAttribute('revenue', (float) ($revenue[$p->woo_id] ?? 0)));
     }
 }

@@ -28,6 +28,7 @@ import { useProductStore, useOrderStore, useCustomerStore, useBackendSyncStore }
 import { formatCurrency, formatDate, formatNumber } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
 import { stockState } from '@/utils/stock';
+import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import {
   AreaChart,
   Area,
@@ -42,13 +43,14 @@ interface TopProductItem {
   id: string;
   name: string;
   sku: string;
-  price: number;
+  price?: number;
   salesCount: number;
   revenue: number;
   image: string;
 }
 
 export function DashboardPage() {
+  const currencyLabel = useCurrencyLabel();
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState('30d');
 
@@ -96,7 +98,7 @@ export function DashboardPage() {
         id: String(tp.id),
         name: tp.name,
         sku: tp.sku ?? '',
-        price: tp.total_sales > 0 ? tp.revenue / tp.total_sales : 0,
+        price: tp.total_sales > 0 ? tp.revenue / tp.total_sales : undefined,
         salesCount: tp.total_sales,
         revenue: tp.revenue,
         image: tp.image_url ?? '',
@@ -190,12 +192,12 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatCurrency(totalRevenue)}
+                {summary ? formatCurrency(totalRevenue) : '—'}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
                 <Change value={revenueChange} />
                 <span className="text-slate-400">
-                  {revenueChange === null ? `last ${summary?.days ?? 30} days` : 'vs previous period'}
+                  {summary ? (revenueChange === null ? `last ${summary.days} days` : 'vs previous period') : ''}
                 </span>
               </div>
             </div>
@@ -215,12 +217,12 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatNumber(ordersInPeriod)}
+                {summary ? formatNumber(ordersInPeriod) : '—'}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
                 <Change value={ordersChange} />
                 <span className="text-slate-400">
-                  {processingOrders} processing
+                  {summary ? `${processingOrders} processing` : ''}
                 </span>
               </div>
             </div>
@@ -240,7 +242,7 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatNumber(summary?.published_products ?? 0)}
+                {summary ? formatNumber(summary.published_products) : '—'}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
                 {(summary?.out_of_stock_products ?? 0) > 0 ? (
@@ -269,7 +271,7 @@ export function DashboardPage() {
             </div>
             <div className="mt-3">
               <div className="text-2xl font-bold text-slate-900">
-                {formatNumber(summary?.customers ?? 0)}
+                {summary ? formatNumber(summary.customers) : '—'}
               </div>
               <div className="flex items-center gap-1.5 mt-1 text-xs">
                 <span className="text-slate-400">registered customers</span>
@@ -295,7 +297,7 @@ export function DashboardPage() {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <span className="h-2.5 w-2.5 rounded-full bg-red-600"></span>
-                <span>Revenue (₹)</span>
+                <span>Revenue{currencyLabel}</span>
               </div>
             </div>
           </CardHeader>
@@ -328,7 +330,7 @@ export function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#64748b', fontSize: 11 }}
-                    tickFormatter={(v) => `₹${v}`}
+                    tickFormatter={(v) => formatNumber(v)}
                   />
                   <Tooltip
                     content={({ active, payload }) => {
@@ -485,7 +487,7 @@ export function DashboardPage() {
                   <div className="flex items-center gap-3">
                     {getOrderStatusBadge(order.status)}
                     <span className="text-xs font-bold text-slate-800 w-16 text-right">
-                      {formatCurrency(order.total)}
+                      {formatCurrency(order.total, order.currency)}
                     </span>
                     <ArrowUpRight className="h-4 w-4 text-slate-400" />
                   </div>
@@ -544,7 +546,7 @@ export function DashboardPage() {
                         {p.name}
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        {p.salesCount} sold • {formatCurrency(p.price)}
+                        {p.salesCount} sold{p.price !== undefined ? ` • ${formatCurrency(p.price)}` : ''}
                       </p>
                     </div>
                   </div>

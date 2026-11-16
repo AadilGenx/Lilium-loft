@@ -34,9 +34,11 @@ import { useShippingStore } from '@/store';
 import { ShippingMethod } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
 import { getErrorMessage } from '@/utils/errors';
+import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import { toast } from 'sonner';
 
 export function ShippingPage() {
+  const currencyLabel = useCurrencyLabel();
   const {
     shippingZones,
     isLoading,
@@ -348,7 +350,7 @@ export function ShippingPage() {
 
             {methodType === 'flat_rate' && (
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Cost (₹)</label>
+                <label className="font-semibold text-slate-700">Cost{currencyLabel}</label>
                 <Input
                   type="number"
                   step="0.01"

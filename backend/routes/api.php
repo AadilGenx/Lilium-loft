@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Controllers\Api\WriteSettingController;
 use App\Http\Controllers\Api\Write\CategoryWriteController;
 use App\Http\Controllers\Api\Write\CouponWriteController;
 use App\Http\Controllers\Api\Write\CustomerWriteController;
@@ -41,6 +42,7 @@ Route::prefix('v1')->group(function () {
         Route::get('dashboard/orders-by-status', [DashboardController::class, 'ordersByStatus']);
         Route::get('dashboard/top-products', [DashboardController::class, 'topProducts']);
         Route::get('sync/status', [DashboardController::class, 'syncStatus']);
+        Route::get('write-settings', [WriteSettingController::class, 'index']);
 
         Route::get('orders', [OrderController::class, 'index']);
         Route::get('orders/{id}', [OrderController::class, 'show'])->whereNumber('id');
@@ -76,8 +78,14 @@ Route::prefix('v1')->group(function () {
         Route::get('reports/stock', [ReportController::class, 'stock']);
     });
 
+    // Polled every few seconds by the admin panel; has its own rate limit so it never eats the normal read allowance.
+    Route::get('sync/changes', [SyncController::class, 'changes'])->middleware(['auth:api', 'throttle:240,1,api-poll']);
+
     // Import from WooCommerce into the local database. READ-ONLY towards WooCommerce (GET only), so it needs no write switch.
     Route::post('sync', [SyncController::class, 'run'])->middleware(['auth:api', 'throttle:6,1,api-sync']);
+
+    // Flipping the write switches themselves: needs can_write (checked in the controller), not a write switch.
+    Route::put('write-settings/{key}', [WriteSettingController::class, 'update'])->middleware(['auth:api', 'throttle:30,1,api-write-settings']);
 
     // Write routes: each one names the capability switch it needs.
     Route::middleware(['auth:api', 'throttle:30,1,api-write'])->group(function () {

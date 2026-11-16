@@ -50,9 +50,11 @@ import { couponSchema, CouponFormValues } from '@/schemas';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
 import { getErrorMessage } from '@/utils/errors';
+import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import { toast } from 'sonner';
 
 export function CouponsListPage() {
+  const currencyLabel = useCurrencyLabel();
   const { coupons, fetchCoupons, createCoupon, updateCoupon, deleteCoupon } = useCouponStore();
 
   useEffect(() => {
@@ -368,8 +370,8 @@ export function CouponsListPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="percent">Percentage discount (%)</SelectItem>
-                    <SelectItem value="fixed_cart">Fixed cart discount (₹)</SelectItem>
-                    <SelectItem value="fixed_product">Fixed product discount (₹)</SelectItem>
+                    <SelectItem value="fixed_cart">Fixed cart discount{currencyLabel}</SelectItem>
+                    <SelectItem value="fixed_product">Fixed product discount{currencyLabel}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -424,7 +426,7 @@ export function CouponsListPage() {
             {/* Restrictions */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Minimum Spend (₹)</label>
+                <label className="font-semibold text-slate-700">Minimum Spend{currencyLabel}</label>
                 <Input
                   type="number"
                   placeholder="0.00"
@@ -432,7 +434,7 @@ export function CouponsListPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-slate-700">Maximum Spend (₹)</label>
+                <label className="font-semibold text-slate-700">Maximum Spend{currencyLabel}</label>
                 <Input
                   type="number"
                   placeholder="No limit"

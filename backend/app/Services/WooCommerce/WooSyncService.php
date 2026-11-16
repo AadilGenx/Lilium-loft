@@ -56,7 +56,7 @@ class WooSyncService
         return $n;
     }
 
-    public function storeCategory(array $c): WooCategory
+    private function persistCategory(array $c): WooCategory
     {
         return WooCategory::updateOrCreate(['woo_id' => $c['id']], [
             'parent_woo_id' => $c['parent'] ?? 0,
@@ -80,7 +80,7 @@ class WooSyncService
     }
 
     /** Save one WooCommerce product payload into the local mirror (local DB only). */
-    public function storeProduct(array $p): WooProduct
+    private function persistProduct(array $p): WooProduct
     {
         return DB::transaction(function () use ($p) {
             $product = WooProduct::updateOrCreate(['woo_id' => $p['id']], [
@@ -127,7 +127,7 @@ class WooSyncService
         return $n;
     }
 
-    public function storeCustomer(array $c): WooCustomer
+    private function persistCustomer(array $c): WooCustomer
     {
         return WooCustomer::updateOrCreate(['woo_id' => $c['id']], [
             'email' => $c['email'] ?: null,
@@ -158,7 +158,7 @@ class WooSyncService
         return $n;
     }
 
-    public function storeOrder(array $o): WooOrder
+    private function persistOrder(array $o): WooOrder
     {
         return DB::transaction(function () use ($o) {
             $b = $o['billing'] ?? [];
@@ -220,7 +220,7 @@ class WooSyncService
         return $n;
     }
 
-    public function storeCoupon(array $c): WooCoupon
+    private function persistCoupon(array $c): WooCoupon
     {
         return WooCoupon::updateOrCreate(['woo_id' => $c['id']], [
             'code' => $c['code'],
@@ -240,7 +240,7 @@ class WooSyncService
      * Remove one record from the LOCAL mirror (used when WooCommerce reports it deleted).
      * Never contacts WooCommerce.
      */
-    public function forget(string $resource, int $wooId): void
+    private function removeLocal(string $resource, int $wooId): void
     {
         DB::transaction(function () use ($resource, $wooId) {
             match ($resource) {
@@ -261,5 +261,55 @@ class WooSyncService
     private function date(?string $v): ?Carbon
     {
         return $v ? Carbon::parse($v, 'UTC') : null;
+    }
+
+    public function storeCategory(array $record): WooCategory
+    {
+        $model = $this->persistCategory($record);
+        MirrorVersion::bump('categories');
+
+        return $model;
+    }
+
+    public function storeProduct(array $record): WooProduct
+    {
+        $model = $this->persistProduct($record);
+        MirrorVersion::bump('products');
+
+        return $model;
+    }
+
+    public function storeCustomer(array $record): WooCustomer
+    {
+        $model = $this->persistCustomer($record);
+        MirrorVersion::bump('customers');
+
+        return $model;
+    }
+
+    public function storeOrder(array $record): WooOrder
+    {
+        $model = $this->persistOrder($record);
+        MirrorVersion::bump('orders');
+
+        return $model;
+    }
+
+    public function storeCoupon(array $record): WooCoupon
+    {
+        $model = $this->persistCoupon($record);
+        MirrorVersion::bump('coupons');
+
+        return $model;
+    }
+
+    /**
+     * Remove one record from the LOCAL mirror (used when WooCommerce reports it deleted).
+     * Never contacts WooCommerce.
+     */
+    public function forget(string $resource, int $wooId): void
+    {
+        $this->removeLocal($resource, $wooId);
+        MirrorVersion::bump(['order' => 'orders', 'product' => 'products', 'customer' => 'customers', 'coupon' => 'coupons', 'category' => 'categories'][$resource]);
     }
 }

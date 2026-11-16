@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useUIStore, useProductStore, useOrderStore, useCustomerStore } from '@/store';
 import { Search, Package, ShoppingCart, Users, ArrowRight } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatMoney } from '@/utils/formatters';
 import { initials } from '@/utils/initials';
 
 export function SearchModal() {
@@ -126,7 +126,7 @@ export function SearchModal() {
                           {p.name}
                         </div>
                         <div className="text-xs text-slate-400">
-                          SKU: {p.sku} • {formatCurrency(p.price)}
+                          SKU: {p.sku} • {formatMoney(p.price)}
                         </div>
                       </div>
                     </div>
@@ -158,7 +158,7 @@ export function SearchModal() {
                           Order {o.orderNumber} - {o.customerName}
                         </div>
                         <div className="text-xs text-slate-400">
-                          Status: {o.status} • Total: {formatCurrency(o.total)}
+                          Status: {o.status} • Total: {formatCurrency(o.total, o.currency)}
                         </div>
                       </div>
                     </div>

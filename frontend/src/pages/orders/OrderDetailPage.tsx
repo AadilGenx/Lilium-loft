@@ -38,9 +38,11 @@ import { useOrderStore } from '@/store';
 import { OrderStatus } from '@/types';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { getErrorMessage } from '@/utils/errors';
+import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import { toast } from 'sonner';
 
 export function OrderDetailPage() {
+  const currencyLabel = useCurrencyLabel();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { orders, loadOrderDetails, updateOrderStatus, addOrderNote, refundOrder } = useOrderStore();
@@ -50,7 +52,7 @@ export function OrderDetailPage() {
   // Notes and refunds live in WooCommerce; load them for this order.
   useEffect(() => {
     if (id && order?.id) loadOrderDetails(id);
-  }, [id, order?.id, loadOrderDetails]);
+  }, [id, order?.id, order?.status, order?.total, loadOrderDetails]);
 
   // New Note State
   const [newNote, setNewNote] = useState('');
@@ -100,11 +102,11 @@ export function OrderDetailPage() {
 
   const handleProcessRefund = async () => {
     if (refundAmount <= 0) {
-      toast.error('Refund amount must be greater than ₹0.');
+      toast.error('Refund amount must be greater than zero.');
       return;
     }
     if (refundAmount > remainingRefundable) {
-      toast.error(`Maximum refundable amount is ${formatCurrency(remainingRefundable)}.`);
+      toast.error(`Maximum refundable amount is ${formatCurrency(remainingRefundable, order.currency)}.`);
       return;
     }
     if (!refundReason.trim()) {
@@ -114,7 +116,7 @@ export function OrderDetailPage() {
 
     try {
       await refundOrder(order.id, refundAmount, refundReason.trim());
-      toast.success(`Refund of ${formatCurrency(refundAmount)} recorded in WooCommerce.`);
+      toast.success(`Refund of ${formatCurrency(refundAmount, order.currency)} recorded in WooCommerce.`);
       setRefundModalOpen(false);
       setRefundReason('');
     } catch (err) {
@@ -252,10 +254,10 @@ export function OrderDetailPage() {
 
                     <div className="text-left sm:text-right flex sm:flex-col justify-between items-center sm:items-end">
                       <div className="text-sm font-bold text-slate-900">
-                        {formatCurrency(item.total)}
+                        {formatCurrency(item.total, order.currency)}
                       </div>
                       <div className="text-xs text-slate-400">
-                        {formatCurrency(item.price)} × {item.quantity}
+                        {formatCurrency(item.price, order.currency)} × {item.quantity}
                       </div>
                     </div>
                   </div>
@@ -267,32 +269,32 @@ export function OrderDetailPage() {
                 <div className="flex justify-between text-slate-600">
                   <span>Items Subtotal:</span>
                   <span className="font-medium text-slate-900">
-                    {formatCurrency(order.subtotal)}
+                    {formatCurrency(order.subtotal, order.currency)}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>Shipping & Delivery:</span>
                   <span className="font-medium text-slate-900">
-                    {order.shippingTotal === 0 ? 'Free Shipping' : formatCurrency(order.shippingTotal)}
+                    {order.shippingTotal === 0 ? 'Free Shipping' : formatCurrency(order.shippingTotal, order.currency)}
                   </span>
                 </div>
                 {order.discountTotal > 0 && (
                   <div className="flex justify-between text-emerald-600 font-medium">
                     <span>Discount Applied:</span>
-                    <span>-{formatCurrency(order.discountTotal)}</span>
+                    <span>-{formatCurrency(order.discountTotal, order.currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-slate-600">
                   <span>Sales Tax (WooCommerce Tax):</span>
                   <span className="font-medium text-slate-900">
-                    {formatCurrency(order.taxTotal)}
+                    {formatCurrency(order.taxTotal, order.currency)}
                   </span>
                 </div>
 
                 {totalRefunded > 0 && (
                   <div className="flex justify-between text-purple-600 font-medium pt-1 border-t border-slate-200">
                     <span>Total Refunded:</span>
-                    <span>-{formatCurrency(totalRefunded)}</span>
+                    <span>-{formatCurrency(totalRefunded, order.currency)}</span>
                   </div>
                 )}
 
@@ -533,13 +535,13 @@ export function OrderDetailPage() {
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs flex justify-between">
               <span className="text-slate-600">Max Refundable Amount:</span>
               <span className="font-bold text-slate-900">
-                {formatCurrency(remainingRefundable)}
+                {formatCurrency(remainingRefundable, order.currency)}
               </span>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">
-                Refund Amount (₹)
+                Refund Amount{currencyLabel}
               </label>
               <Input
                 type="number"
@@ -576,7 +578,7 @@ export function OrderDetailPage() {
               onClick={handleProcessRefund}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Confirm Refund of {formatCurrency(refundAmount)}
+              Confirm Refund of {formatCurrency(refundAmount, order.currency)}
             </Button>
           </DialogFooter>
         </DialogContent>

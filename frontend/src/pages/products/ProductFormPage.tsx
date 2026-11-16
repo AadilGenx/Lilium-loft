@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,9 +19,11 @@ import { productSchema, ProductFormValues } from '@/schemas';
 import { useProductStore, useCategoryStore } from '@/store';
 import { ProductImage } from '@/types';
 import { getErrorMessage } from '@/utils/errors';
+import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import { toast } from 'sonner';
 
 export function ProductFormPage() {
+  const currencyLabel = useCurrencyLabel();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
@@ -61,8 +63,11 @@ export function ProductFormPage() {
   });
 
   // The product list may arrive after this page opens (direct link / refresh): fill the form then.
+  // Only once per product: later background refreshes must never overwrite what is being edited.
+  const filledFor = useRef<string | null>(existingProduct?.id ?? null);
   useEffect(() => {
-    if (!existingProduct) return;
+    if (!existingProduct || filledFor.current === existingProduct.id) return;
+    filledFor.current = existingProduct.id;
     reset({
       name: existingProduct.name,
       slug: existingProduct.slug,
@@ -80,7 +85,7 @@ export function ProductFormPage() {
     });
     setImages(existingProduct.images);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingProduct?.id, existingProduct?.updatedAt]);
+  }, [existingProduct?.id]);
 
   const productType = watch('type');
   const manageStock = watch('manageStock');
@@ -131,7 +136,7 @@ export function ProductFormPage() {
       sku: data.sku,
       type: data.type,
       status: data.status,
-      regularPrice: data.regularPrice ?? 0,
+      regularPrice: data.regularPrice,
       salePrice: data.salePrice,
       manageStock: data.manageStock,
       stockQuantity: data.stockQuantity,
@@ -298,7 +303,7 @@ export function ProductFormPage() {
                   {/* Regular Price */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-700">
-                      Regular Price (₹) <span className="text-red-500">*</span>
+                      Regular Price{currencyLabel} <span className="text-red-500">*</span>
                     </label>
                     <Input
                       type="number"
@@ -315,7 +320,7 @@ export function ProductFormPage() {
                   {/* Sale Price */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-700">
-                      Sale Price (₹)
+                      Sale Price{currencyLabel}
                     </label>
                     <Input
                       type="number"

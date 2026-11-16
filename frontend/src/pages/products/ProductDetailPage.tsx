@@ -24,8 +24,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useProductStore, useOrderStore } from '@/store';
-import { formatCurrency, formatDate } from '@/utils/formatters';
-import { stockState } from '@/utils/stock';
+import { formatCurrency, formatDate, formatMoney } from '@/utils/formatters';
+import { stockState, isOnSale } from '@/utils/stock';
 import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
@@ -59,15 +59,9 @@ export function ProductDetailPage() {
     );
   }
 
-  // Calculate product sales from orders
-  const relatedOrders = orders.filter((o) =>
-    o.items.some((item) => item.productId === String(product.wooId))
-  );
-  const totalUnitsSold = relatedOrders.reduce((sum, o) => {
-    const item = o.items.find((i) => i.productId === String(product.wooId));
-    return sum + (item ? item.quantity : 0);
-  }, 0);
-  const totalRevenue = totalUnitsSold * product.price;
+  // Lifetime figures straight from the backend: units from WooCommerce, revenue from paid orders.
+  const totalUnitsSold = product.totalSales;
+  const totalRevenue = product.revenue;
 
   const handleDelete = async () => {
     try {
@@ -184,17 +178,17 @@ export function ProductDetailPage() {
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-bold text-slate-900">
-                {formatCurrency(product.price)}
+                {formatMoney(product.price)}
               </span>
-              {product.regularPrice > product.price && (
+              {isOnSale(product) && (
                 <span className="text-xs text-slate-400 line-through">
-                  {formatCurrency(product.regularPrice)}
+                  {formatMoney(product.regularPrice)}
                 </span>
               )}
             </div>
-            {product.regularPrice > product.price && (
+            {isOnSale(product) && (
               <span className="inline-block text-[11px] font-semibold text-emerald-600 mt-0.5">
-                Save {formatCurrency(product.regularPrice - product.price)} on sale
+                Save {formatMoney((product.regularPrice ?? 0) - (product.price ?? 0))} on sale
               </span>
             )}
           </CardContent>
@@ -241,10 +235,10 @@ export function ProductDetailPage() {
               Sales Volume
             </span>
             <div className="text-2xl font-bold text-slate-900 mt-1">
-              {totalUnitsSold > 0 ? `${totalUnitsSold} Units` : '42 Units'}
+              {totalUnitsSold} {totalUnitsSold === 1 ? 'Unit' : 'Units'}
             </div>
-            <span className="text-[11px] text-emerald-600 font-medium block mt-0.5">
-              Top 10% bestseller
+            <span className="text-[11px] text-slate-400 block mt-0.5">
+              {totalUnitsSold > 0 ? 'Lifetime units sold' : 'No sales yet'}
             </span>
           </CardContent>
         </Card>
@@ -256,10 +250,10 @@ export function ProductDetailPage() {
               Generated Revenue
             </span>
             <div className="text-2xl font-bold text-slate-900 mt-1">
-              {totalRevenue > 0 ? formatCurrency(totalRevenue) : formatCurrency(product.price * 42)}
+              {formatCurrency(totalRevenue)}
             </div>
             <span className="text-[11px] text-slate-400 block mt-0.5">
-              Lifetime store earnings
+              From completed and processing orders
             </span>
           </CardContent>
         </Card>
@@ -281,9 +275,11 @@ export function ProductDetailPage() {
               ) : (
                 <Package className="h-16 w-16 text-slate-300" />
               )}
-              <span className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-[11px] px-2 py-0.5 rounded-md backdrop-blur-sm">
-                {activeImageIndex + 1} of {product.images.length || 1}
-              </span>
+              {product.images.length > 0 && (
+                <span className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-[11px] px-2 py-0.5 rounded-md backdrop-blur-sm">
+                  {activeImageIndex + 1} of {product.images.length}
+                </span>
+              )}
             </div>
 
             {/* Thumbnails Row */}

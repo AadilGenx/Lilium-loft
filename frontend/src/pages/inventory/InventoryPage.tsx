@@ -42,7 +42,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useProductStore } from '@/store';
 import { Product } from '@/types';
-import { formatCurrency } from '@/utils/formatters';
+import { formatMoney } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
 import { stockState } from '@/utils/stock';
 import { getErrorMessage } from '@/utils/errors';
@@ -131,9 +131,9 @@ export function InventoryPage() {
       products.map((p) => ({
         SKU: p.sku,
         Name: p.name,
-        StockQuantity: p.stockQuantity,
+        StockQuantity: p.manageStock ? p.stockQuantity : '',
         StockStatus: p.stockStatus,
-        Price: p.price,
+        Price: p.price ?? '',
         Categories: p.categories.join('; '),
       })),
       'woocommerce-inventory-audit'
@@ -335,7 +335,7 @@ export function InventoryPage() {
                         {p.sku}
                       </TableCell>
                       <TableCell className="font-semibold text-slate-900">
-                        {formatCurrency(p.price)}
+                        {formatMoney(p.price)}
                       </TableCell>
                       <TableCell>
                         <span

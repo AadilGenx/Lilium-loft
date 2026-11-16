@@ -55,8 +55,9 @@ export interface Product {
   sku: string;
   type: ProductType;
   status: ProductStatus;
-  price: number;
-  regularPrice: number;
+  /** undefined when WooCommerce has no price for the product (e.g. a draft). */
+  price?: number;
+  regularPrice?: number;
   salePrice?: number;
   manageStock: boolean;
   stockQuantity: number;
@@ -71,6 +72,10 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   featured?: boolean;
+  /** Units sold over the product's lifetime, as counted by WooCommerce. */
+  totalSales: number;
+  /** Lifetime revenue from completed and processing orders. */
+  revenue: number;
 }
 
 export type OrderStatus =

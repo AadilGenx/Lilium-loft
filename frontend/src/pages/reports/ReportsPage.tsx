@@ -209,10 +209,10 @@ export function ReportsPage() {
                   Gross Sales
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {formatCurrency(totals?.gross_sales ?? 0)}
+                  {totals ? formatCurrency(totals.gross_sales) : '—'}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">
-                  {totals?.items_sold ?? 0} items sold
+                  {totals ? `${totals.items_sold} items sold` : ''}
                 </div>
               </CardContent>
             </Card>
@@ -223,7 +223,7 @@ export function ReportsPage() {
                   Net Sales
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {formatCurrency(totals?.net_sales ?? 0)}
+                  {totals ? formatCurrency(totals.net_sales) : '—'}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">Gross minus shipping & tax</div>
               </CardContent>
@@ -234,9 +234,9 @@ export function ReportsPage() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Orders Placed
                 </span>
-                <div className="text-2xl font-bold text-slate-900 mt-1">{totals?.orders ?? 0}</div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">{totals ? totals.orders : '—'}</div>
                 <div className="text-xs text-slate-400 mt-1">
-                  {formatCurrency(totals?.discounts ?? 0)} in discounts
+                  {totals ? `${formatCurrency(totals.discounts)} in discounts` : ''}
                 </div>
               </CardContent>
             </Card>
@@ -247,7 +247,7 @@ export function ReportsPage() {
                   Avg. Order Value (AOV)
                 </span>
                 <div className="text-2xl font-bold text-slate-900 mt-1">
-                  {formatCurrency(totals?.average_order_value ?? 0)}
+                  {totals ? formatCurrency(totals.average_order_value) : '—'}
                 </div>
                 <div className="text-xs text-slate-400 mt-1">Per order</div>
               </CardContent>
@@ -260,7 +260,7 @@ export function ReportsPage() {
                 Gross vs Net Revenue
               </CardTitle>
               <CardDescription className="text-xs">
-                Grouped by {sales?.group_by ?? 'day'}
+                {sales ? `Grouped by ${sales.group_by}` : ''}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">

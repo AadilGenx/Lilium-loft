@@ -37,13 +37,9 @@ class WriteSettingResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $envOn = config('woocommerce.writes_allowed') === true;
-
         return $table
             ->heading('Write controls')
-            ->description($envOn
-                ? 'Environment flag WOO_WRITES_ALLOWED is ON. The switches below decide what the API may change in the live store.'
-                : 'Environment flag WOO_WRITES_ALLOWED is OFF: nothing can be written, whatever the switches below say.')
+            ->description('The master switch and the switches below decide what the API may change in the live store. The same switches are in the web app under Settings → Store changes.')
             ->columns([
                 TextColumn::make('label')->label('Feature'),
                 ToggleColumn::make('enabled')->label('Enabled')

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
 /**
  * The ONLY class that can change data in WooCommerce.
  *
- * Every call re-checks the environment flag and master switch, so a code path
+ * Every call re-checks the master switch, so a code path
  * that forgets the route middleware still cannot write while writes are off.
  * Writes are never retried automatically: a retry of a POST could duplicate it.
  */

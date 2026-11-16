@@ -22,9 +22,9 @@ class WriteSetting extends Model
         return (bool) static::query()->where('key', $key)->value('enabled');
     }
 
-    /** True only when the environment flag AND the master switch are both on. */
+    /** True only when the master switch ("Allow changes to the store", set in the web app) is on. */
     public static function writesOpen(): bool
     {
-        return config('woocommerce.writes_allowed') === true && static::isOn('master');
+        return static::isOn('master');
     }
 }

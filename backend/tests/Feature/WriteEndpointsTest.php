@@ -28,7 +28,6 @@ class WriteEndpointsTest extends TestCase
             'woocommerce.base_url' => 'https://shop.test',
             'woocommerce.consumer_key' => 'ck_test',
             'woocommerce.consumer_secret' => 'cs_test',
-            'woocommerce.writes_allowed' => true,
             'woocommerce.config_cache_ttl' => 0,
         ]);
     }

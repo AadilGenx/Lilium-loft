@@ -21,6 +21,7 @@ import {
   BackendCategoryReportRow,
   BackendProductReportRow,
   BackendCustomerReportRow,
+  BackendWriteSettings,
 } from './types';
 
 const json = (body: unknown) => JSON.stringify(body);
@@ -350,6 +351,17 @@ export const notificationsApi = {
   },
 };
 
+// ----------------- Store-change switches -----------------
+export const writeSettingsApi = {
+  async get(): Promise<BackendWriteSettings> {
+    return apiClient<BackendWriteSettings>('/write-settings');
+  },
+
+  async set(key: string, enabled: boolean): Promise<BackendWriteSettings> {
+    return apiClient<BackendWriteSettings>(`/write-settings/${key}`, { method: 'PUT', body: json({ enabled }) });
+  },
+};
+
 // ----------------- Import from WooCommerce -----------------
 export interface StoreImportResult {
   ok: boolean;
@@ -357,7 +369,20 @@ export interface StoreImportResult {
   finished_at: string;
 }
 
+export interface ChangeCounters {
+  products: number;
+  orders: number;
+  customers: number;
+  coupons: number;
+  categories: number;
+}
+
 export const syncApi = {
+  /** Counters that go up whenever the backend's copy of the store data changes. Cheap to poll. */
+  async changes(): Promise<ChangeCounters> {
+    return apiClient<ChangeCounters>('/sync/changes');
+  },
+
   /** Asks the backend to pull everything from WooCommerce into its database (read-only towards the store). */
   async run(): Promise<StoreImportResult> {
     return apiClient<StoreImportResult>('/sync', { method: 'POST' });

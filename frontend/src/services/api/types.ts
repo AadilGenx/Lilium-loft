@@ -64,6 +64,8 @@ export interface BackendProduct {
   description?: string | null;
   short_description?: string | null;
   featured?: boolean;
+  /** Lifetime revenue from completed and processing orders (computed by the backend). */
+  revenue?: number;
   gallery?: { id: number; src: string; alt: string }[];
 }
 
@@ -172,6 +174,8 @@ export interface BackendDashboardSummary {
   average_order_value: number;
   awaiting_fulfilment: number;
   customers: number;
+  /** Currency of the most recent order; null when there are no orders yet. */
+  currency: string | null;
   published_products: number;
   out_of_stock_products: number;
 }
@@ -315,4 +319,20 @@ export interface BackendCustomerReportRow {
   orders: number;
   total_spent: number;
   last_order_at: string;
+}
+
+// ----- Store-change switches -----
+
+export interface BackendWriteSwitch {
+  key: string;
+  label: string;
+  enabled: boolean;
+}
+
+export interface BackendWriteSettings {
+  /** Whether the signed-in user may flip the switches. */
+  can_manage: boolean;
+  master: BackendWriteSwitch;
+  permanent_delete: BackendWriteSwitch;
+  capabilities: (BackendWriteSwitch & { group: string })[];
 }

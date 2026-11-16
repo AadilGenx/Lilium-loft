@@ -67,8 +67,8 @@ export function mapBackendProduct(p: BackendProduct): Product {
     sku: p.sku ?? '',
     type: p.type as ProductType,
     status: p.status as ProductStatus,
-    price: num(p.price) ?? 0,
-    regularPrice: num(p.regular_price) ?? num(p.price) ?? 0,
+    price: num(p.price),
+    regularPrice: num(p.regular_price) ?? num(p.price),
     salePrice: num(p.sale_price),
     manageStock: Boolean(p.manage_stock),
     // Only meaningful when manageStock is true; otherwise stockStatus is the source of truth.
@@ -84,6 +84,8 @@ export function mapBackendProduct(p: BackendProduct): Product {
     createdAt: p.woo_created_at ?? '',
     updatedAt: p.woo_modified_at ?? p.woo_created_at ?? '',
     featured: Boolean(p.featured),
+    totalSales: p.total_sales ?? 0,
+    revenue: p.revenue ?? 0,
   };
 }
 
@@ -220,7 +222,7 @@ export function mapBackendCoupon(c: BackendCoupon): Coupon {
   return {
     id: String(c.id),
     code: c.code,
-    discountType: (c.discount_type ?? 'fixed_cart') as Coupon['discountType'],
+    discountType: c.discount_type as Coupon['discountType'],
     amount: num(c.amount) ?? 0,
     description: c.description ?? '',
     expiryDate: c.expires_at ?? undefined,

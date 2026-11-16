@@ -45,9 +45,9 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useProductStore } from '@/store';
 import { Product } from '@/types';
-import { formatCurrency } from '@/utils/formatters';
+import { formatCurrency, formatMoney } from '@/utils/formatters';
 import { exportToCSV } from '@/utils/csv';
-import { stockState } from '@/utils/stock';
+import { stockState, isOnSale } from '@/utils/stock';
 import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
@@ -118,8 +118,8 @@ export function ProductsListPage() {
         Name: p.name,
         SKU: p.sku,
         Type: p.type,
-        Price: p.price,
-        StockQuantity: p.stockQuantity,
+        Price: p.price ?? '',
+        StockQuantity: p.manageStock ? p.stockQuantity : '',
         StockStatus: p.stockStatus,
         Categories: p.categories.join('; '),
         Status: p.status,
@@ -344,11 +344,11 @@ export function ProductsListPage() {
                     {/* Price */}
                     <TableCell>
                       <div className="font-semibold text-slate-900">
-                        {formatCurrency(product.price)}
+                        {formatMoney(product.price)}
                       </div>
-                      {product.regularPrice > product.price && (
+                      {isOnSale(product) && (
                         <div className="text-[11px] text-slate-400 line-through">
-                          {formatCurrency(product.regularPrice)}
+                          {formatMoney(product.regularPrice)}
                         </div>
                       )}
                     </TableCell>

@@ -280,7 +280,7 @@ export function OrdersListPage() {
                       {order.paymentMethodTitle}
                     </TableCell>
                     <TableCell className="text-right font-bold text-slate-900">
-                      {formatCurrency(order.total)}
+                      {formatCurrency(order.total, order.currency)}
                     </TableCell>
                     <TableCell className="text-right">
                       <ChevronRight className="h-4 w-4 text-slate-400 inline" />

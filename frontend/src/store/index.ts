@@ -14,6 +14,7 @@ import {
   ProductCategory,
   Address,
 } from '@/types';
+import { setDisplayCurrency } from '@/utils/formatters';
 import {
   ApiError,
   authApi,
@@ -28,6 +29,8 @@ import {
   settingsApi,
   notificationsApi,
   syncApi,
+  writeSettingsApi,
+  BackendWriteSettings,
   StoreImportResult,
   mapBackendProduct,
   mapBackendOrder,
@@ -54,6 +57,32 @@ import {
 
 const readError = (err: unknown, fallback: string) => (err instanceof ApiError && err.message ? err.message : fallback);
 
+/** Options for the list loaders. `silent` is used by background updates: no loading flag, no error state. */
+export interface FetchOptions {
+  silent?: boolean;
+}
+
+/**
+ * Returns the previous list itself when nothing changed, and otherwise reuses every unchanged item,
+ * so a background refresh re-renders only the rows that really changed (and nothing at all if none did).
+ */
+function keepUnchanged<T extends { id: string }>(prev: T[], next: T[]): T[] {
+  const old = new Map(prev.map((p) => [p.id, p]));
+  let identical = prev.length === next.length;
+
+  const merged = next.map((n, i) => {
+    const p = old.get(n.id);
+    if (p && JSON.stringify(p) === JSON.stringify(n)) {
+      if (prev[i] !== p) identical = false;
+      return p;
+    }
+    identical = false;
+    return n;
+  });
+
+  return identical ? prev : merged;
+}
+
 // ================= PRODUCT STORE =================
 /** What the product form collects. */
 export interface ProductInput {
@@ -62,7 +91,7 @@ export interface ProductInput {
   sku: string;
   type: ProductType;
   status: ProductStatus;
-  regularPrice: number;
+  regularPrice?: number;
   salePrice?: number;
   manageStock: boolean;
   stockQuantity: number;
@@ -87,7 +116,9 @@ function buildProductPayload(next: ProductInput, prev: Product | null, categorie
 
   // Variable products keep prices on their variations, which this API does not edit.
   if (next.type === 'simple') {
-    if (changed(next.regularPrice, prev?.regularPrice)) payload.regular_price = String(next.regularPrice);
+    if (next.regularPrice !== undefined && changed(next.regularPrice, prev?.regularPrice)) {
+      payload.regular_price = String(next.regularPrice);
+    }
     if (changed(next.salePrice, prev?.salePrice) && (prev || next.salePrice !== undefined)) {
       payload.sale_price = next.salePrice === undefined ? null : String(next.salePrice);
     }
@@ -116,7 +147,7 @@ interface ProductStore {
   products: Product[];
   isLoading: boolean;
   error: string | null;
-  fetchProducts: () => Promise<void>;
+  fetchProducts: (opts?: FetchOptions) => Promise<void>;
   /** Returns the new product's id (null if the backend could not give one yet). */
   createProduct: (input: ProductInput) => Promise<string | null>;
   updateProduct: (id: string, input: ProductInput) => Promise<void>;
@@ -128,14 +159,15 @@ export const useProductStore = create<ProductStore>((set, get) => ({
   products: [],
   isLoading: false,
   error: null,
-  fetchProducts: async () => {
-    set({ isLoading: true, error: null });
+  fetchProducts: async ({ silent = false } = {}) => {
+    if (!silent) set({ isLoading: true, error: null });
     try {
       const res = await productsApi.list({ per_page: 100 });
-      set({ products: (res.data ?? []).map(mapBackendProduct), isLoading: false });
+      const products = keepUnchanged(get().products, (res.data ?? []).map(mapBackendProduct));
+      set(silent ? { products } : { products, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch products:', err);
-      set({ isLoading: false, error: readError(err, 'Failed to fetch products') });
+      if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch products') });
     }
   },
   createProduct: async (input) => {
@@ -179,7 +211,7 @@ interface OrderStore {
   orders: Order[];
   isLoading: boolean;
   error: string | null;
-  fetchOrders: () => Promise<void>;
+  fetchOrders: (opts?: FetchOptions) => Promise<void>;
   /** Loads the notes and refunds recorded in WooCommerce for one order. */
   loadOrderDetails: (id: string) => Promise<void>;
   updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
@@ -199,14 +231,21 @@ export const useOrderStore = create<OrderStore>((set, get) => {
     orders: [],
     isLoading: false,
     error: null,
-    fetchOrders: async () => {
-      set({ isLoading: true, error: null });
+    fetchOrders: async ({ silent = false } = {}) => {
+      if (!silent) set({ isLoading: true, error: null });
       try {
         const res = await ordersApi.list({ per_page: 100, with_items: 1 });
-        set({ orders: (res.data ?? []).map(mapBackendOrder), isLoading: false });
+        // Notes and refunds are loaded per order; keep what is already loaded so a refresh does not blank them.
+        const loaded = new Map(get().orders.map((o) => [o.id, o]));
+        const orders = (res.data ?? []).map(mapBackendOrder).map((o) => {
+          const prev = loaded.get(o.id);
+          return prev ? { ...o, notes: prev.notes, refunds: prev.refunds } : o;
+        });
+        const merged = keepUnchanged(get().orders, orders);
+        set(silent ? { orders: merged } : { orders: merged, isLoading: false });
       } catch (err) {
         console.warn('Failed to fetch orders:', err);
-        set({ isLoading: false, error: readError(err, 'Failed to fetch orders') });
+        if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch orders') });
       }
     },
     loadOrderDetails: async (id) => {
@@ -284,7 +323,7 @@ interface CustomerStore {
   customers: Customer[];
   isLoading: boolean;
   error: string | null;
-  fetchCustomers: () => Promise<void>;
+  fetchCustomers: (opts?: FetchOptions) => Promise<void>;
   createCustomer: (input: CustomerInput) => Promise<string | null>;
   updateCustomerAddress: (id: string, address: Address) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
@@ -294,14 +333,15 @@ export const useCustomerStore = create<CustomerStore>((set, get) => ({
   customers: [],
   isLoading: false,
   error: null,
-  fetchCustomers: async () => {
-    set({ isLoading: true, error: null });
+  fetchCustomers: async ({ silent = false } = {}) => {
+    if (!silent) set({ isLoading: true, error: null });
     try {
       const res = await customersApi.list({ per_page: 100 });
-      set({ customers: (res.data ?? []).map(mapBackendCustomer), isLoading: false });
+      const customers = keepUnchanged(get().customers, (res.data ?? []).map(mapBackendCustomer));
+      set(silent ? { customers } : { customers, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch customers:', err);
-      set({ isLoading: false, error: readError(err, 'Failed to fetch customers') });
+      if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch customers') });
     }
   },
   createCustomer: async (input) => {
@@ -336,7 +376,7 @@ interface CategoryStore {
   categories: ProductCategory[];
   isLoading: boolean;
   error: string | null;
-  fetchCategories: () => Promise<void>;
+  fetchCategories: (opts?: FetchOptions) => Promise<void>;
   createCategory: (input: { name: string; slug?: string; description?: string; image?: string }) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
 }
@@ -345,14 +385,15 @@ export const useCategoryStore = create<CategoryStore>((set, get) => ({
   categories: [],
   isLoading: false,
   error: null,
-  fetchCategories: async () => {
-    set({ isLoading: true, error: null });
+  fetchCategories: async ({ silent = false } = {}) => {
+    if (!silent) set({ isLoading: true, error: null });
     try {
       const res = await categoriesApi.list(undefined, 100);
-      set({ categories: (res.data ?? []).map(mapBackendCategory), isLoading: false });
+      const categories = keepUnchanged(get().categories, (res.data ?? []).map(mapBackendCategory));
+      set(silent ? { categories } : { categories, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch categories:', err);
-      set({ isLoading: false, error: readError(err, 'Failed to fetch categories') });
+      if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch categories') });
     }
   },
   createCategory: async ({ name, slug, description, image }) => {
@@ -401,7 +442,7 @@ interface CouponStore {
   coupons: Coupon[];
   isLoading: boolean;
   error: string | null;
-  fetchCoupons: () => Promise<void>;
+  fetchCoupons: (opts?: FetchOptions) => Promise<void>;
   createCoupon: (input: CouponInput) => Promise<void>;
   updateCoupon: (id: string, input: CouponInput) => Promise<void>;
   deleteCoupon: (id: string) => Promise<void>;
@@ -411,14 +452,15 @@ export const useCouponStore = create<CouponStore>((set, get) => ({
   coupons: [],
   isLoading: false,
   error: null,
-  fetchCoupons: async () => {
-    set({ isLoading: true, error: null });
+  fetchCoupons: async ({ silent = false } = {}) => {
+    if (!silent) set({ isLoading: true, error: null });
     try {
       const res = await couponsApi.list(undefined, 100);
-      set({ coupons: (res.data ?? []).map(mapBackendCoupon), isLoading: false });
+      const coupons = keepUnchanged(get().coupons, (res.data ?? []).map(mapBackendCoupon));
+      set(silent ? { coupons } : { coupons, isLoading: false });
     } catch (err) {
       console.warn('Failed to fetch coupons:', err);
-      set({ isLoading: false, error: readError(err, 'Failed to fetch coupons') });
+      if (!silent) set({ isLoading: false, error: readError(err, 'Failed to fetch coupons') });
     }
   },
   createCoupon: async (input) => {
@@ -573,6 +615,32 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 }));
 
+// ================= STORE-CHANGE SWITCHES =================
+interface WriteSettingsStore {
+  data: BackendWriteSettings | null;
+  isLoading: boolean;
+  fetchSettings: () => Promise<void>;
+  /** Turns one switch on or off. Throws if the backend refuses (e.g. the user may not change it). */
+  setSwitch: (key: string, enabled: boolean) => Promise<void>;
+}
+
+export const useWriteSettingsStore = create<WriteSettingsStore>((set) => ({
+  data: null,
+  isLoading: false,
+  fetchSettings: async () => {
+    set({ isLoading: true });
+    try {
+      set({ data: await writeSettingsApi.get(), isLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch store-change settings:', err);
+      set({ isLoading: false });
+    }
+  },
+  setSwitch: async (key, enabled) => {
+    set({ data: await writeSettingsApi.set(key, enabled) });
+  },
+}));
+
 // ================= UI STORE =================
 export interface NotificationItem {
   id: string;
@@ -610,7 +678,8 @@ export const useUIStore = create<UIStore>((set, get) => ({
   fetchNotifications: async () => {
     try {
       const res = await notificationsApi.list();
-      set({ notifications: res.data.map(mapBackendNotification) });
+      const next = res.data.map(mapBackendNotification);
+      if (JSON.stringify(next) !== JSON.stringify(get().notifications)) set({ notifications: next });
     } catch (err) {
       console.warn('Failed to fetch notifications:', err);
     }
@@ -644,6 +713,8 @@ export interface BackendSyncState {
   topProducts: BackendTopProduct[];
   ordersByStatus: Record<string, number>;
   syncAll: () => Promise<boolean>;
+  /** Reloads only the dashboard numbers (summary, chart, top products). */
+  refreshDashboard: () => Promise<void>;
   /** Pulls everything from WooCommerce into the backend database, then reloads every screen from it. */
   importFromStore: () => Promise<StoreImportResult>;
   login: (email: string, password: string) => Promise<boolean>;
@@ -660,7 +731,9 @@ const clearAllData = () => {
   useShippingStore.setState({ shippingZones: [], error: null });
   usePaymentStore.setState({ gateways: [], error: null });
   useSettingsStore.setState({ groups: [], settings: {}, error: null });
+  useWriteSettingsStore.setState({ data: null });
   useUIStore.setState({ notifications: [] });
+  setDisplayCurrency(null);
 };
 
 export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
@@ -703,6 +776,30 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
       ordersByStatus: {},
       lastSynced: null,
     });
+  },
+
+  refreshDashboard: async () => {
+    try {
+      const [summary, revenueHistory, ordersByStatus, topProducts] = await Promise.all([
+        dashboardApi.getSummary(30),
+        dashboardApi.getRevenue(),
+        dashboardApi.getOrdersByStatus(),
+        dashboardApi.getTopProducts(),
+      ]);
+      const cur = get();
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      const patch: Partial<BackendSyncState> = {};
+      if (!same(cur.summary, summary)) {
+        setDisplayCurrency(summary.currency);
+        patch.summary = summary;
+      }
+      if (!same(cur.revenueHistory, revenueHistory ?? [])) patch.revenueHistory = revenueHistory ?? [];
+      if (!same(cur.ordersByStatus, ordersByStatus ?? {})) patch.ordersByStatus = ordersByStatus ?? {};
+      if (!same(cur.topProducts, topProducts ?? [])) patch.topProducts = topProducts ?? [];
+      if (Object.keys(patch).length > 0) set(patch);
+    } catch (err) {
+      console.warn('Dashboard refresh failed:', err);
+    }
   },
 
   importFromStore: async () => {
@@ -762,6 +859,7 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
 
       if (dash.status === 'fulfilled') {
         const [summary, revenueHistory, ordersByStatus, topProducts] = dash.value;
+        setDisplayCurrency(summary.currency);
         set({ summary, revenueHistory: revenueHistory ?? [], ordersByStatus: ordersByStatus ?? {}, topProducts: topProducts ?? [] });
       } else {
         console.warn('Dashboard fetch error:', dash.reason);

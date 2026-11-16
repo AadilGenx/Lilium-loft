@@ -261,7 +261,7 @@ export function CustomerDetailPage() {
                             {ord.items.length} {ord.items.length === 1 ? 'item' : 'items'}
                           </TableCell>
                           <TableCell className="text-right font-bold text-slate-900 text-xs">
-                            {formatCurrency(ord.total)}
+                            {formatCurrency(ord.total, ord.currency)}
                           </TableCell>
                           <TableCell className="text-right">
                             <ExternalLink className="h-3.5 w-3.5 text-slate-400 inline" />
@@ -292,7 +292,7 @@ export function CustomerDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-slate-400 shrink-0" />
-                <span>{customer.billing.phone || '+1 (217) 555-0192'}</span>
+                <span>{customer.billing.phone || 'No phone number'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
@@ -322,12 +322,20 @@ export function CustomerDetailPage() {
               <p className="font-semibold text-slate-800 text-sm">
                 {customer.billing.firstName} {customer.billing.lastName}
               </p>
-              <p>{customer.billing.address1 || '742 Evergreen Terrace'}</p>
+              {customer.billing.address1 && <p>{customer.billing.address1}</p>}
+              {customer.billing.address2 && <p>{customer.billing.address2}</p>}
               <p>
-                {customer.billing.city || 'Springfield'}, {customer.billing.state || 'IL'}{' '}
-                {customer.billing.postcode || '62704'}
+                {[customer.billing.city, customer.billing.state, customer.billing.postcode]
+                  .filter(Boolean)
+                  .join(', ')}
               </p>
-              <p>{customer.billing.country}</p>
+              {customer.billing.country && <p>{customer.billing.country}</p>}
+              {!customer.billing.address1 &&
+                !customer.billing.city &&
+                !customer.billing.postcode &&
+                !customer.billing.country && (
+                  <p className="text-slate-400">No address on file.</p>
+                )}
             </CardContent>
           </Card>
 
