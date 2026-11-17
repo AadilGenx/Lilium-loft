@@ -54,7 +54,7 @@ export function OrdersListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   // Same rolling window the dashboard uses, so the two can be compared directly.
-  const [period, setPeriod] = useState<string>('all');
+  const [period, setPeriod] = useState<string>('today');
   const [customFrom, setCustomFrom] = useState<string>('');
   const [customTo, setCustomTo] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,18 +97,18 @@ export function OrdersListPage() {
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
     selectedStatus !== 'all' ||
-    (period === 'custom' ? Boolean(customFrom || customTo) : period !== 'all')
+    (period === 'custom' ? Boolean(customFrom || customTo) : period !== 'today')
   );
 
   const activeFilterCount =
     (selectedStatus !== 'all' ? 1 : 0) +
-    (period !== 'all' ? 1 : 0) +
+    (period !== 'today' ? 1 : 0) +
     (searchTerm.trim() ? 1 : 0);
 
   const handleClearFilters = () => {
     setSearchTerm('');
     setSelectedStatus('all');
-    setPeriod('all');
+    setPeriod('today');
     setCustomFrom('');
     setCustomTo('');
     setCurrentPage(1);
@@ -398,11 +398,11 @@ export function OrdersListPage() {
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All time</SelectItem>
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
                   <SelectItem value="custom">Custom range</SelectItem>
                 </SelectContent>
               </Select>
@@ -515,11 +515,11 @@ export function OrdersListPage() {
                 <SelectValue placeholder="All time" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All time</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="7">Last 7 days</SelectItem>
                 <SelectItem value="30">Last 30 days</SelectItem>
                 <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
                 <SelectItem value="custom">Custom range</SelectItem>
               </SelectContent>
             </Select>

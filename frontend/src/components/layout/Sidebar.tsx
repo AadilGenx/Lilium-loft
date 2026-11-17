@@ -140,19 +140,19 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'hidden lg:flex flex-col bg-white border-r border-slate-200/80 h-full shrink-0 transition-all duration-300 z-30 select-none',
+        'hidden lg:flex flex-col bg-white border-r border-slate-200/80 h-full shrink-0 transition-all duration-300 z-30 select-none relative',
         sidebarCollapsed ? 'w-20' : 'w-64'
       )}
     >
-      {/* Brand Header */}
-      <div className="h-20 flex items-center justify-center px-3 border-b border-slate-100 shrink-0">
+      {/* Brand Header & Edge Collapse Toggle */}
+      <div className="h-20 flex items-center justify-center px-3 border-b border-slate-100 shrink-0 relative select-none">
         <NavLink to="/" className="flex items-center justify-center w-full">
           {sidebarCollapsed ? (
-            <div className="h-12 w-12 mx-auto flex items-center justify-center rounded-xl bg-white border border-slate-200/80 p-1 shadow-xs overflow-hidden">
+            <div className="h-11 w-11 mx-auto flex items-center justify-center rounded-xl bg-white border border-slate-200/80 p-1 shadow-2xs overflow-hidden hover:border-red-200 transition-colors">
               <img
-                src="/logo.png"
+                src="/logo-flower.png"
                 alt="Lilium & Loft"
-                className="h-12 w-auto max-w-none object-cover scale-[1.9] -translate-x-1"
+                className="h-8 w-8 object-contain"
               />
             </div>
           ) : (
@@ -165,6 +165,21 @@ export function Sidebar() {
             </div>
           )}
         </NavLink>
+
+        {/* Floating Toggle Arrow on the border edge between sidebar & header */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 z-40 h-6 w-6 rounded-full bg-white border border-slate-200/90 shadow-xs hover:shadow-sm hover:border-slate-300 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all cursor-pointer"
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? (
+            <ChevronRight className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronLeft className="h-3.5 w-3.5" />
+          )}
+        </button>
       </div>
 
       {/* Navigation List */}
@@ -184,7 +199,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => setProductsOpen(!productsOpen)}
                   className={cn(
-                    'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-[15px] font-medium transition-colors',
                     isActive
                       ? 'bg-red-50 text-red-600'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -192,7 +207,7 @@ export function Sidebar() {
                 >
                   <div className="flex items-center gap-3">
                     <Icon className={cn('h-5 w-5', isActive ? 'text-red-600' : 'text-slate-500')} />
-                    <span>{item.title}</span>
+                    <span className="text-[15px]">{item.title}</span>
                   </div>
                   {productsOpen ? (
                     <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -211,13 +226,13 @@ export function Sidebar() {
                           key={sub.title}
                           to={sub.href}
                           className={cn(
-                            'flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                            'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                             isSubActive
                               ? 'text-red-600 bg-red-50/70 font-semibold'
                               : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                           )}
                         >
-                          <SubIcon className="h-3.5 w-3.5" />
+                          <SubIcon className="h-4 w-4" />
                           <span>{sub.title}</span>
                         </NavLink>
                       );
@@ -235,7 +250,7 @@ export function Sidebar() {
               className={({ isActive: navActive }) => {
                 const active = item.href === '/' ? location.pathname === '/' : navActive;
                 return cn(
-                  'flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors group relative',
+                  'flex items-center justify-between px-3 py-2.5 rounded-lg text-[15px] font-medium transition-colors group relative',
                   active
                     ? 'bg-red-50 text-red-600 font-semibold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -250,11 +265,11 @@ export function Sidebar() {
                     isActive ? 'text-red-600' : 'text-slate-500 group-hover:text-slate-900'
                   )}
                 />
-                {!sidebarCollapsed && <span>{item.title}</span>}
+                {!sidebarCollapsed && <span className="text-[15px]">{item.title}</span>}
               </div>
 
               {!sidebarCollapsed && item.badge && (
-                <span className="flex h-5 items-center justify-center rounded-full bg-red-100 px-1.5 text-[10px] font-bold text-red-700">
+                <span className="flex h-5 items-center justify-center rounded-full bg-red-100 px-2 text-xs font-bold text-red-700">
                   {item.badge}
                 </span>
               )}
@@ -270,8 +285,8 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* Footer / User Profile & Collapse Toggle */}
-      <div className="border-t border-slate-100 p-2 space-y-1 shrink-0 bg-slate-50/50">
+      {/* Footer / User Profile */}
+      <div className="border-t border-slate-100 p-2 shrink-0 bg-slate-50/50">
         {/* User Profile Dropdown Button */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -329,23 +344,7 @@ export function Sidebar() {
               className="gap-2.5 text-xs font-medium cursor-pointer py-2 rounded-md hover:bg-slate-100"
             >
               <Settings className="h-3.5 w-3.5 text-slate-500" />
-              <span>Store Settings</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={() => window.open('https://woocommerce.com/documentation/', '_blank')}
-              className="gap-2.5 text-xs font-medium cursor-pointer py-2 rounded-md hover:bg-slate-100"
-            >
-              <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
-              <span>WooCommerce Docs</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={() => navigate('/settings')}
-              className="gap-2.5 text-xs font-medium cursor-pointer py-2 rounded-md hover:bg-slate-100"
-            >
-              <ShieldCheck className="h-3.5 w-3.5 text-slate-500" />
-              <span>Roles & Permissions</span>
+              <span>Settings</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator className="my-1" />
@@ -359,22 +358,6 @@ export function Sidebar() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* Collapse Toggle */}
-        <button
-          onClick={toggleSidebar}
-          className="flex w-full items-center justify-center gap-2 rounded-lg p-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <>
-              <ChevronLeft className="h-4 w-4" />
-              <span>Collapse Sidebar</span>
-            </>
-          )}
-        </button>
       </div>
 
       {/* Logout Confirmation Dialog */}

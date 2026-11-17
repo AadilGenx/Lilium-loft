@@ -16,8 +16,13 @@ export function TopHeader() {
 
   // Pulls everything from WooCommerce into the database, then reloads the screens from it.
   const handleManualSync = async () => {
+    const minLoadingTime = new Promise((resolve) => setTimeout(resolve, 1500));
+    useUIStore.getState().setIsManualSyncing(true);
     try {
-      const res = await importFromStore();
+      const [res] = await Promise.all([
+        importFromStore(),
+        minLoadingTime,
+      ]);
       if (res.ok) {
         const total = res.results.reduce((n, r) => n + r.records, 0);
         toast.success(`Synced from WooCommerce: ${total} records.`);
@@ -29,6 +34,8 @@ export function TopHeader() {
       }
     } catch (err) {
       toast.error(getErrorMessage(err, 'Sync failed: could not reach the backend.'));
+    } finally {
+      useUIStore.getState().setIsManualSyncing(false);
     }
   };
 

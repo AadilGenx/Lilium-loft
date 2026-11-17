@@ -1,4 +1,9 @@
-const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api/v1';
+// Localhost API URL (commented out)
+// const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+// const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api/v1';
+
+// Live Backend API URL
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || 'https://admin-api.liliumloft.com/api/v1';
 
 export class ApiError extends Error {
   status: number;
@@ -19,7 +24,17 @@ export class ApiError extends Error {
  * server crashes (5xx other than 502, which the backend uses for "WooCommerce problem"),
  * rate limits and unreadable replies never show raw text.
  */
-function userMessage(status: number, data: any): string {
+function userMessage(status: number, data: any, endpoint?: string): string {
+  const isAuthLogin = endpoint && /\/auth\/login/.test(endpoint);
+  if (isAuthLogin && (status === 401 || status === 422)) {
+    return (
+      data?.errors?.email?.[0] ||
+      data?.errors?.password?.[0] ||
+      data?.message ||
+      'Invalid email or password. Please verify your credentials.'
+    );
+  }
+
   if (status === 401) return 'Your session has expired. Please sign in again.';
   if (status === 429) return 'Too many requests. Please wait a moment and try again.';
   if (status >= 500 && status !== 502) return 'Something went wrong on the server. Please try again.';
@@ -46,8 +61,12 @@ export const setStoredToken = (token: string | null) => {
   }
 };
 
-const resolveUrl = (endpoint: string) =>
-  endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+const resolveUrl = (endpoint: string) => {
+  if (endpoint.startsWith('http')) return endpoint;
+  const base = String(API_BASE).replace(/\/+$/, '');
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${base}${path}`;
+};
 
 let refreshInFlight: Promise<boolean> | null = null;
 
@@ -134,7 +153,7 @@ async function execute<T>(
       // not JSON (e.g. a proxy error page): fall through to the generic text
     }
 
-    throw new ApiError(userMessage(response.status, errorData), response.status, errorData);
+    throw new ApiError(userMessage(response.status, errorData, endpoint), response.status, errorData);
   }
 
   if (response.status === 204) {

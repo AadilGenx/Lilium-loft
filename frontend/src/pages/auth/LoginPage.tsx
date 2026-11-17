@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   // Return to page user originally tried to access, or dashboard
@@ -40,10 +42,16 @@ export function LoginPage() {
     }
 
     setFieldErrors({});
+    setGeneralError(null);
     setLoading(true);
 
+    const minLoadingTime = new Promise((resolve) => setTimeout(resolve, 2500));
+
     try {
-      const success = await login(email.trim(), password);
+      const [success] = await Promise.all([
+        login(email.trim(), password),
+        minLoadingTime,
+      ]);
       if (success) {
         toast.success('Welcome back! Signed in successfully.');
         navigate(from, { replace: true });
@@ -51,10 +59,16 @@ export function LoginPage() {
         const errorMsg =
           useBackendSyncStore.getState().errorMessage ||
           'Invalid email or password. Please verify your credentials.';
+        setGeneralError(errorMsg);
         toast.error(errorMsg);
       }
     } catch (err: any) {
-      toast.error(getErrorMessage(err, 'Could not sign in. Please try again.'));
+      const errorMsg = getErrorMessage(
+        err,
+        'Invalid email or password. Please verify your credentials.'
+      );
+      setGeneralError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -63,6 +77,9 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen min-h-[100dvh] w-full flex flex-col justify-between items-center bg-gradient-to-br from-slate-50 via-pink-50/20 to-rose-50/40 p-4 sm:p-6 relative overflow-hidden select-none">
+      {/* Centered Loading Animation Overlay */}
+      {loading && <LoadingScreen />}
+
       {/* Background Subtle Gradient Glows */}
       <div className="absolute top-[-10%] right-[-10%] w-80 h-80 rounded-full bg-red-600/5 blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-80 h-80 rounded-full bg-amber-500/5 blur-3xl pointer-events-none" />
@@ -92,6 +109,13 @@ export function LoginPage() {
             <div className="h-px bg-slate-100 w-full" />
 
             <form onSubmit={handleLogin} noValidate className="space-y-3.5">
+              {generalError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                  <span className="font-medium leading-relaxed">{generalError}</span>
+                </div>
+              )}
+
               {/* Email Field */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700 block">
@@ -104,6 +128,7 @@ export function LoginPage() {
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
+                      if (generalError) setGeneralError(null);
                       if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
                     }}
                     placeholder="you@example.com"
@@ -135,6 +160,7 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
+                      if (generalError) setGeneralError(null);
                       if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
                     }}
                     placeholder="••••••••"

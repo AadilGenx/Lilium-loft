@@ -5,19 +5,21 @@ import { TopHeader } from './TopHeader';
 import { MobileNav } from './MobileNav';
 import { SearchModal } from './SearchModal';
 import { Breadcrumbs } from './Breadcrumbs';
-import { Toaster } from 'sonner';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useLiveUpdates } from '@/hooks/useLiveUpdates';
-import { useBackendSyncStore } from '@/store';
+import { useBackendSyncStore, useUIStore } from '@/store';
 
 export function MainLayout() {
   // Reload lists as soon as WooCommerce changes something (no manual refresh needed).
   useLiveUpdates();
 
+  const isManualSyncing = useUIStore((s) => s.isManualSyncing);
   // Amounts are formatted with the store's currency. Redraw the screen once it becomes known (or changes).
   const currency = useBackendSyncStore((s) => s.summary?.currency ?? 'unknown');
 
   return (
     <div className="h-screen h-[100dvh] flex bg-slate-50/50 text-slate-900 font-sans antialiased overflow-hidden">
+      {isManualSyncing && <LoadingScreen />}
       {/* Permanent Fixed Sidebar */}
       <Sidebar />
       <MobileNav />
@@ -36,8 +38,6 @@ export function MainLayout() {
           </div>
         </main>
       </div>
-
-      <Toaster position="top-right" richColors closeButton />
     </div>
   );
 }

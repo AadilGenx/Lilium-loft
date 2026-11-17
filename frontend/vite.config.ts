@@ -14,8 +14,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        // Localhost proxy (commented out)
+        // target: 'http://127.0.0.1:8000',
+        // Live Backend API
+        target: 'https://admin-api.liliumloft.com',
         changeOrigin: true,
+        secure: false,
       },
     },
   },

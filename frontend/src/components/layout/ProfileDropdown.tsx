@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Settings, ExternalLink, ShieldCheck, LogOut } from 'lucide-react';
+import { Settings, LogOut } from 'lucide-react';
 import { useBackendSyncStore } from '@/store';
 import { toast } from 'sonner';
 
@@ -71,20 +71,7 @@ export function ProfileDropdown() {
 
           <DropdownMenuItem onClick={() => navigate('/settings')} className="gap-2 cursor-pointer">
             <Settings className="h-4 w-4 text-slate-500" />
-            <span>Store Settings</span>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem
-            onClick={() => window.open('https://woocommerce.com/documentation/', '_blank')}
-            className="gap-2 cursor-pointer"
-          >
-            <ExternalLink className="h-4 w-4 text-slate-500" />
-            <span>WooCommerce Docs</span>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem onClick={() => navigate('/settings')} className="gap-2 cursor-pointer">
-            <ShieldCheck className="h-4 w-4 text-slate-500" />
-            <span>Roles & Permissions</span>
+            <span>Settings</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

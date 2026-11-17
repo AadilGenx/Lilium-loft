@@ -14,7 +14,29 @@ export default {
       },
     },
     extend: {
+      fontSize: {
+        '2xs': ['0.75rem', { lineHeight: '1rem' }],       // 12px
+        'xs': ['0.875rem', { lineHeight: '1.25rem' }],    // 14px (changed from 12px to 14px)
+        'sm': ['0.9375rem', { lineHeight: '1.375rem' }],  // 15px
+      },
       colors: {
+        slate: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#64748b', // shifted from light #94a3b8 to readable darker gray #64748b
+          500: '#475569', // shifted from #64748b to darker gray #475569
+          600: '#334155', // shifted from #475569 to darker deep slate #334155
+          700: '#1e293b',
+          800: '#0f172a',
+          900: '#020617',
+        },
+        gray: {
+          400: '#6b7280',
+          500: '#4b5563',
+          600: '#374151',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

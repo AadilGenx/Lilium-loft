@@ -693,11 +693,13 @@ interface UIStore {
   sidebarCollapsed: boolean;
   mobileMenuOpen: boolean;
   searchOpen: boolean;
+  isManualSyncing: boolean;
   notifications: NotificationItem[];
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setMobileMenuOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
+  setIsManualSyncing: (val: boolean) => void;
   fetchNotifications: () => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
@@ -707,11 +709,13 @@ export const useUIStore = create<UIStore>((set, get) => ({
   sidebarCollapsed: false,
   mobileMenuOpen: false,
   searchOpen: false,
+  isManualSyncing: false,
   notifications: [],
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
   setSearchOpen: (open) => set({ searchOpen: open }),
+  setIsManualSyncing: (val) => set({ isManualSyncing: val }),
   fetchNotifications: async () => {
     try {
       const res = await notificationsApi.list();
@@ -784,7 +788,7 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
   revenueHistory: [],
   topProducts: [],
   ordersByStatus: {},
-  dashboardDays: 30,
+  dashboardDays: 1,
 
   login: async (email, password) => {
     set({ status: 'syncing', errorMessage: null });
