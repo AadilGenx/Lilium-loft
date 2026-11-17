@@ -1,5 +1,6 @@
 import { Order } from '@/types';
 import { formatCurrency } from './formatters';
+import { useProductStore } from '@/store';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
@@ -73,9 +74,21 @@ export function generateInvoiceHTML(order: Order): string {
   const itemsRows = order.items.map((item, idx) => {
     const itemPrice = item.price || (item.quantity > 0 ? item.total / item.quantity : 0);
     const itemTotal = item.total || itemPrice * item.quantity;
-    const imgHtml = item.image
-      ? `<img src="${item.image}" alt="${item.name}" class="item-thumb" />`
-      : `<div class="item-thumb-placeholder"></div>`;
+    const products = useProductStore.getState().products;
+    const product = products.find(
+      (p) =>
+        (item.productId && (String(p.id) === String(item.productId) || String(p.wooId) === String(item.productId))) ||
+        (item.sku && p.sku && String(p.sku).trim() === String(item.sku).trim()) ||
+        (item.name && p.name && p.name.trim().toLowerCase() === item.name.trim().toLowerCase())
+    );
+    const itemImg =
+      item.image ||
+      product?.images?.[0]?.src ||
+      (product as any)?.image_url ||
+      (product as any)?.imageUrl;
+    const imgHtml = itemImg
+      ? `<img src="${itemImg}" alt="${item.name}" class="item-thumb" referrerpolicy="no-referrer" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';" /><div class="item-thumb-placeholder" style="display:none;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;">🧶</div>`
+      : `<div class="item-thumb-placeholder" style="display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;">🧶</div>`;
 
     return `
       <tr>
@@ -96,152 +109,143 @@ export function generateInvoiceHTML(order: Order): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title></title>
+  <title>Invoice #${order.orderNumber}</title>
   <style>
     @page {
       size: A4 portrait;
       margin: 0;
     }
-    * {
+    .invoice-wrapper, .invoice-wrapper * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-    html, body {
-      margin: 0;
-      padding: 0;
+    .invoice-wrapper {
+      width: 794px;
+      max-width: 794px;
+      min-width: 794px;
+      margin: 0 auto;
+      padding: 36px 36px;
       background: #ffffff;
-      color: #1e293b;
+      color: #0f172a;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 12px;
+      font-size: 11.5px;
       line-height: 1.45;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
-    }
-    .invoice-wrapper {
-      width: 100%;
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 10mm 10mm;
-      background: #ffffff;
+      box-sizing: border-box;
       position: relative;
     }
 
-    /* Top Grid: Left (Invoice + Logo), Middle (spacer), Right (From) */
-    .top-section {
-      display: grid;
-      grid-template-columns: 38% 30% 32%;
-      gap: 16px;
-      margin-bottom: 24px;
-      align-items: start;
+    table.layout-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      border: none;
     }
+    table.layout-table td {
+      padding: 0;
+      border: none;
+      vertical-align: top;
+    }
+
     .invoice-title {
-      font-size: 19px;
-      font-weight: 800;
+      font-size: 22px;
+      font-weight: 900;
       letter-spacing: 0.05em;
       color: #0f172a;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .invoice-logo {
-      height: 52px;
-      width: auto;
-      max-width: 220px;
-      object-fit: contain;
+      width: 190px;
+      max-width: 190px;
+      height: auto;
       display: block;
     }
     .from-block {
-      font-size: 11.5px;
+      font-size: 11px;
       color: #334155;
       line-height: 1.5;
     }
     .from-block strong {
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 700;
       color: #0f172a;
       display: block;
       margin-bottom: 4px;
     }
 
-    /* 3-Column Info: Bill to, Ship to, Meta */
-    .details-section {
-      display: grid;
-      grid-template-columns: 38% 30% 32%;
-      gap: 16px;
-      margin-bottom: 30px;
-      font-size: 11.5px;
+    .col-block {
+      font-size: 11px;
+      color: #334155;
       line-height: 1.5;
     }
     .col-block strong {
       display: block;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 700;
       color: #0f172a;
       margin-bottom: 4px;
     }
-    .meta-block {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      font-size: 11.5px;
+    .client-name {
+      font-weight: 600;
+      color: #0f172a;
     }
-    .meta-line {
-      display: flex;
-      gap: 4px;
+
+    table.meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    table.meta-table td {
+      padding: 2.5px 0;
+      vertical-align: top;
     }
     .meta-label {
       font-weight: 700;
       color: #0f172a;
       white-space: nowrap;
+      width: 115px;
     }
     .meta-val {
       color: #334155;
     }
 
-    /* Table */
-    .table-container {
-      margin-bottom: 20px;
-    }
     table.invoice-table {
       width: 100%;
       border-collapse: collapse;
+      margin-top: 15px;
+      margin-bottom: 20px;
       font-size: 11.5px;
     }
     table.invoice-table th {
       padding: 10px 8px;
       border-top: 1px solid #cbd5e1;
-      border-bottom: 1.5px solid #94a3b8;
-      font-size: 12px !important;
+      border-bottom: 2px solid #94a3b8;
+      font-size: 11.5px !important;
       font-weight: 700 !important;
       color: #0f172a !important;
       vertical-align: bottom;
       line-height: 1.3;
+      background: #ffffff;
     }
     table.invoice-table td {
-      padding: 10px 8px;
+      padding: 9px 8px;
       border-bottom: 1px solid #e2e8f0;
       color: #334155;
       vertical-align: middle;
-      font-size: 11.5px;
+      font-size: 11px;
     }
     .col-sno { width: 36px; text-align: left; }
     .col-img { width: 56px; text-align: left; }
-    .col-sku { width: 60px; text-align: left; }
-    .col-prod { text-align: left; }
-    .col-qty { width: 65px; text-align: center; }
-    .col-unit { width: 95px; text-align: right; white-space: nowrap; }
+    .col-sku { width: 60px; text-align: left; font-family: monospace; }
+    .col-prod { text-align: left; font-weight: 600; color: #0f172a; }
+    .col-qty { width: 65px; text-align: center; font-weight: 500; }
+    .col-unit { width: 95px; text-align: right; white-space: nowrap; font-weight: 500; }
     .col-tax-item { width: 60px; text-align: center; }
     .col-tax-total { width: 60px; text-align: center; }
-    .col-total { width: 105px; text-align: right; white-space: nowrap; }
-
-    table.invoice-table td.col-prod {
-      font-weight: 500;
-      color: #0f172a;
-    }
-    table.invoice-table td.col-total {
-      font-weight: 600;
-      color: #0f172a;
-    }
+    .col-total { width: 105px; text-align: right; white-space: nowrap; font-weight: 700; color: #0f172a; }
 
     .item-thumb {
       width: 44px;
@@ -254,26 +258,14 @@ export function generateInvoiceHTML(order: Order): string {
     .item-thumb-placeholder {
       width: 44px;
       height: 44px;
-      background: #f1f5f9;
+      background: #f8fafc;
       border-radius: 8px;
       border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    /* Bottom section with stamp and totals */
-    .bottom-section {
-      display: flex;
-      justify-content: flex-end;
-      align-items: flex-start;
-      position: relative;
-      margin-top: 8px;
-    }
-    .stamp-container {
-      position: absolute;
-      right: 310px;
-      top: -16px;
-      z-index: 10;
-      pointer-events: none;
-    }
     .stamp {
       display: inline-block;
       padding: 5px 14px;
@@ -281,27 +273,29 @@ export function generateInvoiceHTML(order: Order): string {
       border-radius: 5px;
       color: #8A1538;
       font-weight: 900;
-      font-size: 17px;
+      font-size: 16px;
       letter-spacing: 2px;
       text-transform: uppercase;
-      transform: rotate(-32deg);
+      transform: rotate(-25deg);
       opacity: 0.88;
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.85);
     }
-    .totals-box {
-      width: 290px;
+
+    table.totals-table {
+      width: 100%;
+      border-collapse: collapse;
       font-size: 11.5px;
     }
-    .totals-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 5px 0;
+    table.totals-table td {
+      padding: 3.5px 0;
       color: #334155;
     }
-    .totals-row.grand-total {
+    table.totals-table td.text-right {
+      text-align: right;
+    }
+    .grand-total-row td {
+      padding-top: 8px !important;
       border-top: 1.5px solid #cbd5e1;
-      margin-top: 6px;
-      padding-top: 8px;
       font-size: 13.5px;
       font-weight: 700;
       color: #0f172a;
@@ -313,7 +307,7 @@ export function generateInvoiceHTML(order: Order): string {
         margin: 0;
       }
       html, body {
-        width: 210mm;
+        width: 210mm !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #ffffff !important;
@@ -336,112 +330,123 @@ export function generateInvoiceHTML(order: Order): string {
 <body>
   <div class="invoice-wrapper">
     <!-- Top Section (INVOICE + Logo on left, From on right) -->
-    <div class="top-section">
-      <div class="title-logo-block">
-        <div class="invoice-title">INVOICE</div>
-        <img src="${logoUrl}" alt="Lilium & Loft Crochet Studio" class="invoice-logo" />
-      </div>
-      <div></div>
-      <div class="from-block">
-        <strong>From</strong>
-        Lilium and Loft Crochet Studio<br />
-        45 (13), 2nd Cross, Venkata Nagar<br />
-        605011<br />
-        Pondicherry (Puducherry)
-      </div>
-    </div>
+    <table class="layout-table top-table">
+      <tr>
+        <td style="width: 46%; vertical-align: top;">
+          <div class="invoice-title">INVOICE</div>
+          <img src="${logoUrl}" alt="Lilium & Loft Crochet Studio" class="invoice-logo" width="180" style="width: 180px; max-width: 180px; height: auto; display: block;" />
+        </td>
+        <td style="width: 18%;"></td>
+        <td style="width: 36%; vertical-align: top;">
+          <div class="from-block">
+            <strong>From</strong>
+            Lilium and Loft Crochet Studio<br />
+            45 (13), 2nd Cross, Venkata Nagar<br />
+            605011<br />
+            Pondicherry (Puducherry)
+          </div>
+        </td>
+      </tr>
+    </table>
 
     <!-- 3-Column Info (Bill to, Ship to, Invoice Meta) -->
-    <div class="details-section">
-      <div class="col-block">
-        <strong>Bill to</strong>
-        ${billName}<br />
-        ${billAddr1 ? billAddr1 + '<br />' : ''}
-        ${billAddr2 ? billAddr2 + '<br />' : ''}
-        ${billCity} ${billPostcode}<br />
-        ${billState}<br />
-        ${billPhone}
-      </div>
-      <div class="col-block">
-        <strong>Ship to</strong>
-        ${shipName}<br />
-        ${shipAddr1 ? shipAddr1 + '<br />' : ''}
-        ${shipAddr2 ? shipAddr2 + '<br />' : ''}
-        ${shipCity} ${shipPostcode}<br />
-        ${shipState}<br />
-        ${shipPhone}
-      </div>
-      <div class="meta-block">
-        <div class="meta-line">
-          <span class="meta-label">Invoice no:</span>
-          <span class="meta-val">${invoiceNo}</span>
-        </div>
-        <div class="meta-line">
-          <span class="meta-label">Order date:</span>
-          <span class="meta-val">${orderDate}</span>
-        </div>
-        <div class="meta-line">
-          <span class="meta-label">Payment method:</span>
-          <span class="meta-val">${paymentMethod}</span>
-        </div>
-      </div>
-    </div>
+    <table class="layout-table details-table" style="margin-top: 24px; margin-bottom: 24px;">
+      <tr>
+        <td style="width: 38%; vertical-align: top; padding-right: 12px;">
+          <div class="col-block">
+            <strong>Bill to</strong>
+            <span class="client-name">${billName}</span><br />
+            ${billAddr1 ? billAddr1 + '<br />' : ''}
+            ${billAddr2 ? billAddr2 + '<br />' : ''}
+            ${billCity} ${billPostcode}<br />
+            ${billState}<br />
+            ${billPhone}
+          </div>
+        </td>
+        <td style="width: 32%; vertical-align: top; padding-right: 12px;">
+          <div class="col-block">
+            <strong>Ship to</strong>
+            <span class="client-name">${shipName}</span><br />
+            ${shipAddr1 ? shipAddr1 + '<br />' : ''}
+            ${shipAddr2 ? shipAddr2 + '<br />' : ''}
+            ${shipCity} ${shipPostcode}<br />
+            ${shipState}<br />
+            ${shipPhone}
+          </div>
+        </td>
+        <td style="width: 30%; vertical-align: top;">
+          <table class="meta-table">
+            <tr>
+              <td class="meta-label">Invoice no:</td>
+              <td class="meta-val">${invoiceNo}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Order date:</td>
+              <td class="meta-val">${orderDate}</td>
+            </tr>
+            <tr>
+              <td class="meta-label">Payment method:</td>
+              <td class="meta-val" style="text-transform: capitalize;">${paymentMethod}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
     <!-- Items Table -->
-    <div class="table-container">
-      <table class="invoice-table">
-        <thead>
-          <tr>
-            <th class="col-sno">S.No</th>
-            <th class="col-img">Image</th>
-            <th class="col-sku">SKU</th>
-            <th class="col-prod">Product</th>
-            <th class="col-qty">Quantity</th>
-            <th class="col-unit">Unit price</th>
-            <th class="col-tax-item">Tax<br />items</th>
-            <th class="col-tax-total">Total<br />Tax</th>
-            <th class="col-total">Total price</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsRows}
-        </tbody>
-      </table>
-    </div>
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th class="col-sno">S.No</th>
+          <th class="col-img">Image</th>
+          <th class="col-sku">SKU</th>
+          <th class="col-prod">Product</th>
+          <th class="col-qty">Quantity</th>
+          <th class="col-unit">Unit price</th>
+          <th class="col-tax-item">Tax<br />items</th>
+          <th class="col-tax-total">Total<br />Tax</th>
+          <th class="col-total">Total price</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows}
+      </tbody>
+    </table>
 
     <!-- Bottom Section with Stamp & Totals -->
-    <div class="bottom-section">
-      <div class="stamp-container">
-        <div class="stamp">${stampText}</div>
-      </div>
-
-      <div class="totals-box">
-        <div class="totals-row">
-          <span>Subtotal</span>
-          <span>${formatCurrency(subtotal, order.currency)}</span>
-        </div>
-        <div class="totals-row">
-          <span>Shipping</span>
-          <span>${order.shippingTotal > 0 ? `${formatCurrency(order.shippingTotal, order.currency)} via Weight Based Shipping` : 'Free Shipping'}</span>
-        </div>
-        ${order.discountTotal > 0 ? `
-          <div class="totals-row">
-            <span>Discount</span>
-            <span>-${formatCurrency(order.discountTotal, order.currency)}</span>
-          </div>
-        ` : ''}
-        ${order.taxTotal > 0 ? `
-          <div class="totals-row">
-            <span>Tax</span>
-            <span>${formatCurrency(order.taxTotal, order.currency)}</span>
-          </div>
-        ` : ''}
-        <div class="totals-row grand-total">
-          <span>Total</span>
-          <span>${formatCurrency(order.total, order.currency)}</span>
-        </div>
-      </div>
-    </div>
+    <table class="layout-table bottom-table" style="margin-top: 15px;">
+      <tr>
+        <td style="width: 58%; vertical-align: middle; text-align: center;">
+          <div class="stamp">${stampText}</div>
+        </td>
+        <td style="width: 42%; vertical-align: top;">
+          <table class="totals-table">
+            <tr>
+              <td>Subtotal</td>
+              <td class="text-right">${formatCurrency(subtotal, order.currency)}</td>
+            </tr>
+            <tr>
+              <td>Shipping</td>
+              <td class="text-right">${order.shippingTotal > 0 ? `${formatCurrency(order.shippingTotal, order.currency)} via Weight Based Shipping` : 'Free'}</td>
+            </tr>
+            ${order.discountTotal > 0 ? `
+            <tr>
+              <td>Discount</td>
+              <td class="text-right">-${formatCurrency(order.discountTotal, order.currency)}</td>
+            </tr>` : ''}
+            ${order.taxTotal > 0 ? `
+            <tr>
+              <td>Tax</td>
+              <td class="text-right">${formatCurrency(order.taxTotal, order.currency)}</td>
+            </tr>` : ''}
+            <tr class="grand-total-row">
+              <td>Total</td>
+              <td class="text-right">${formatCurrency(order.total, order.currency)}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>`;
@@ -496,59 +501,78 @@ export function printInvoice(order: Order): void {
 }
 
 /**
- * Directly downloads the invoice as a PDF file without opening the browser print dialog.
+ * Directly downloads the invoice as a PDF file with layout identical to Print View,
+ * using an isolated iframe so the host page zoom, viewport, styles, and scroll are NEVER affected.
  */
-export async function downloadInvoicePDF(
-  order: Order,
-  sourceElement?: HTMLElement | null
-): Promise<void> {
+export async function downloadInvoicePDF(order: Order): Promise<void> {
   const invoiceNo = getInvoiceNumber(order);
   const filename = `Invoice-${invoiceNo}.pdf`;
-
-  const opt = {
-    margin: [10, 10, 10, 10] as [number, number, number, number],
-    filename: filename,
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-    },
-    jsPDF: {
-      unit: 'mm',
-      format: 'a4',
-      orientation: 'portrait' as const,
-    },
-  };
-
-  if (sourceElement) {
-    await html2pdf().set(opt).from(sourceElement).save();
-    return;
-  }
-
-  // Create temporary container for table row direct download
   const html = generateInvoiceHTML(order);
+
+  // Render in an isolated off-screen iframe to prevent any viewport, zoom, or style changes to the host page
   const iframe = document.createElement('iframe');
+  iframe.id = 'invoice-download-frame';
   iframe.style.position = 'fixed';
-  iframe.style.left = '-9999px';
   iframe.style.top = '0';
-  iframe.style.width = '210mm';
-  iframe.style.height = '297mm';
+  iframe.style.left = '0';
+  iframe.style.width = '794px';
+  iframe.style.height = '1123px';
   iframe.style.border = '0';
-  iframe.style.opacity = '0';
+  iframe.style.opacity = '0.001';
+  iframe.style.pointerEvents = 'none';
+  iframe.style.zIndex = '-9999';
+
   document.body.appendChild(iframe);
 
   try {
     const doc = iframe.contentWindow?.document;
-    if (!doc) throw new Error('Could not open print context');
+    if (!doc) throw new Error('Cannot access iframe document');
+
     doc.open();
     doc.write(html);
     doc.close();
 
-    // Give browser time to load styles and images
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    const element = (doc.querySelector('.invoice-wrapper') as HTMLElement) || doc.body;
-    await html2pdf().set(opt).from(element).save();
+    // Ensure all images inside the iframe are loaded before capturing
+    const images = Array.from(doc.querySelectorAll('img'));
+    await Promise.race([
+      Promise.all(
+        images.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) {
+                resolve();
+              } else {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+              }
+            })
+        )
+      ),
+      new Promise((resolve) => setTimeout(resolve, 800)),
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    const targetEl = (doc.querySelector('.invoice-wrapper') as HTMLElement) || doc.body;
+
+    const opt = {
+      margin: 0,
+      filename: filename,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait' as const,
+      },
+    };
+
+    await html2pdf().set(opt).from(targetEl).save();
   } finally {
     if (document.body.contains(iframe)) {
       document.body.removeChild(iframe);

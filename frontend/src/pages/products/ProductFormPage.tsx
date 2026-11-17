@@ -47,6 +47,7 @@ export function ProductFormPage() {
     formState: { errors, isSubmitting },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
+    mode: 'onChange',
     defaultValues: {
       name: existingProduct?.name ?? '',
       slug: existingProduct?.slug ?? '',
@@ -98,13 +99,13 @@ export function ProductFormPage() {
   // Auto generate slug from name
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
-    setValue('name', name);
+    setValue('name', name, { shouldValidate: true, shouldDirty: true });
     if (!isEditing) {
       const generatedSlug = name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)+/g, '');
-      setValue('slug', generatedSlug);
+      setValue('slug', generatedSlug, { shouldValidate: true, shouldDirty: true });
     }
   };
 
@@ -288,11 +289,12 @@ export function ProductFormPage() {
                   <label className="text-xs font-semibold text-slate-700">
                     URL Slug <span className="text-red-500">*</span>
                   </label>
-                  <div className={`flex items-center rounded-md border ${errors.slug ? 'border-red-500' : 'border-slate-300'} bg-slate-50 px-3 text-xs text-slate-500 overflow-x-auto`}>
-                    <span className="shrink-0">store.com/product/</span>
+                  <div className={`flex items-center rounded-md border ${errors.slug ? 'border-red-500' : 'border-slate-300'} bg-slate-50 px-3 text-xs text-slate-500 focus-within:ring-1 focus-within:ring-red-500 focus-within:border-red-500 overflow-x-auto transition-colors`}>
+                    <span className="shrink-0 text-slate-400 select-none">store.com/product/</span>
                     <input
                       {...register('slug')}
-                      className="w-full bg-transparent p-2 text-xs font-mono text-slate-800 outline-none min-w-[120px]"
+                      placeholder="url-slug"
+                      className="w-full bg-transparent py-2 pl-0.5 pr-2 text-xs font-mono text-slate-800 outline-none min-w-[120px]"
                     />
                   </div>
                   {errors.slug && (

@@ -83,6 +83,7 @@ export interface BackendOrderItem {
   quantity: number;
   subtotal: string;
   total: string;
+  image_url?: string | null;
 }
 
 export interface BackendOrder {

@@ -17,6 +17,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'quantity', type: 'integer'),
         new OA\Property(property: 'subtotal', type: 'string', example: '1250.00'),
         new OA\Property(property: 'total', type: 'string', example: '1250.00'),
+        new OA\Property(property: 'image_url', type: 'string', nullable: true),
     ],
 )]
 final class OrderItemSchema {}

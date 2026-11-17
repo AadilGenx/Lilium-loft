@@ -4,7 +4,6 @@ import {
   Users,
   Search,
   Plus,
-  Download,
   Mail,
   ShoppingBag,
   IndianRupee,
@@ -48,7 +47,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useCustomerStore } from '@/store';
 import { Customer } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { exportToCSV } from '@/utils/csv';
 import { initials } from '@/utils/initials';
 import { getErrorMessage } from '@/utils/errors';
 import { DeleteCustomerDialog } from '@/components/customers/DeleteCustomerDialog';
@@ -76,7 +74,40 @@ export function CustomersListPage() {
   // Add customer modal
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [hasValidated, setHasValidated] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+
+  const handleCustomerFieldChange = (field: 'firstName' | 'lastName' | 'email', value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (hasValidated || formErrors[field]) {
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        const trimmed = value.trim();
+        if (field === 'firstName') {
+          if (!trimmed) {
+            next.firstName = 'First name is required';
+          } else {
+            delete next.firstName;
+          }
+        } else if (field === 'lastName') {
+          if (!trimmed) {
+            next.lastName = 'Last name is required';
+          } else {
+            delete next.lastName;
+          }
+        } else if (field === 'email') {
+          if (!trimmed) {
+            next.email = 'Email address is required';
+          } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+            next.email = 'Please enter a valid email address';
+          } else {
+            delete next.email;
+          }
+        }
+        return next;
+      });
+    }
+  };
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -112,6 +143,7 @@ export function CustomersListPage() {
 
   const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasValidated(true);
     const errs: Record<string, string> = {};
     if (!formData.firstName.trim()) {
       errs.firstName = 'First name is required';
@@ -151,6 +183,7 @@ export function CustomersListPage() {
 
     toast.success(`Customer "${formData.firstName} ${formData.lastName}" registered.`);
     setAddModalOpen(false);
+    setHasValidated(false);
     setFormErrors({});
     setFormData({
       firstName: '',
@@ -166,21 +199,6 @@ export function CustomersListPage() {
     });
   };
 
-  const handleExport = () => {
-    exportToCSV(
-      customers.map((c) => ({
-        ID: c.id,
-        Name: `${c.firstName} ${c.lastName}`,
-        Email: c.email,
-        Username: c.username,
-        Registered: c.registeredDate,
-        TotalOrders: c.totalOrders,
-        TotalSpent: c.totalSpent,
-      })),
-      'woocommerce-customers'
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -194,15 +212,6 @@ export function CustomersListPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
           <Button
             onClick={() => setAddModalOpen(true)}
             size="sm"
@@ -566,10 +575,7 @@ export function CustomersListPage() {
                 <label className="text-xs font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
                 <Input
                   value={formData.firstName}
-                  onChange={(e) => {
-                    setFormData({ ...formData, firstName: e.target.value });
-                    if (formErrors.firstName) setFormErrors((prev) => ({ ...prev, firstName: undefined! }));
-                  }}
+                  onChange={(e) => handleCustomerFieldChange('firstName', e.target.value)}
                   placeholder="John"
                   className={formErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
@@ -584,10 +590,7 @@ export function CustomersListPage() {
                 <label className="text-xs font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
                 <Input
                   value={formData.lastName}
-                  onChange={(e) => {
-                    setFormData({ ...formData, lastName: e.target.value });
-                    if (formErrors.lastName) setFormErrors((prev) => ({ ...prev, lastName: undefined! }));
-                  }}
+                  onChange={(e) => handleCustomerFieldChange('lastName', e.target.value)}
                   placeholder="Doe"
                   className={formErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
@@ -605,10 +608,7 @@ export function CustomersListPage() {
               <Input
                 type="email"
                 value={formData.email}
-                onChange={(e) => {
-                  setFormData({ ...formData, email: e.target.value });
-                  if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: undefined! }));
-                }}
+                onChange={(e) => handleCustomerFieldChange('email', e.target.value)}
                 placeholder="john.doe@example.com"
                 className={formErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />

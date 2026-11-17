@@ -52,11 +52,31 @@ class DashboardController extends Controller
     )]
     public function summary(Request $request): JsonResponse
     {
-        $days = $this->days($request);
-        $now = now();
+        if ($request->filled('date_from')) {
+            $from = Carbon::parse($request->date_from)->startOfDay();
+            $to = $request->filled('date_to') ? Carbon::parse($request->date_to)->endOfDay() : now()->endOfDay();
+            $diffDays = max(1, (int) $from->diffInDays($to) + 1);
+            $prevFrom = $from->copy()->subDays($diffDays);
+            $prevTo = $from->copy()->subSecond();
 
-        $current = WooOrder::whereIn('status', self::PAID)->where('woo_created_at', '>=', $now->copy()->subDays($days));
-        $previous = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$now->copy()->subDays($days * 2), $now->copy()->subDays($days)]);
+            $current = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$from, $to]);
+            $previous = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$prevFrom, $prevTo]);
+            $days = $diffDays;
+        } elseif ($request->input('days') === 'today' || (int) $request->input('days') === 1) {
+            $from = now()->startOfDay();
+            $to = now()->endOfDay();
+            $prevFrom = now()->subDay()->startOfDay();
+            $prevTo = now()->subDay()->endOfDay();
+
+            $current = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$from, $to]);
+            $previous = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$prevFrom, $prevTo]);
+            $days = 1;
+        } else {
+            $days = $this->days($request);
+            $now = now();
+            $current = WooOrder::whereIn('status', self::PAID)->where('woo_created_at', '>=', $now->copy()->subDays($days));
+            $previous = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$now->copy()->subDays($days * 2), $now->copy()->subDays($days)]);
+        }
 
         // Sales = processing + completed orders, minus what was refunded on them (failed, cancelled, pending and
         // on-hold orders are never counted). "Awaiting payment" are such orders WooCommerce has no payment date for
@@ -106,10 +126,21 @@ class DashboardController extends Controller
     )]
     public function revenue(Request $request): JsonResponse
     {
-        $days = $this->days($request);
-        $from = now()->subDays($days - 1)->startOfDay();
+        if ($request->filled('date_from')) {
+            $from = Carbon::parse($request->date_from)->startOfDay();
+            $to = $request->filled('date_to') ? Carbon::parse($request->date_to)->endOfDay() : now()->endOfDay();
+            $days = max(1, (int) $from->diffInDays($to) + 1);
+        } elseif ($request->input('days') === 'today' || (int) $request->input('days') === 1) {
+            $from = now()->startOfDay();
+            $to = now()->endOfDay();
+            $days = 1;
+        } else {
+            $days = $this->days($request);
+            $from = now()->subDays($days - 1)->startOfDay();
+            $to = now()->endOfDay();
+        }
 
-        $rows = WooOrder::whereIn('status', self::PAID)->where('woo_created_at', '>=', $from)
+        $rows = WooOrder::whereIn('status', self::PAID)->whereBetween('woo_created_at', [$from, $to])
             ->selectRaw('DATE(woo_created_at) as d, SUM(total - refunded_total) as revenue, COUNT(*) as orders')
             ->groupBy('d')->get()->keyBy('d');
 

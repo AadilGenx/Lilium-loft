@@ -60,6 +60,31 @@ export function CustomerDetailPage() {
   // Address edit modal state
   const [editAddressOpen, setEditAddressOpen] = useState(false);
   const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
+  const [addressValidated, setAddressValidated] = useState(false);
+
+  const handleAddressFieldChange = (field: 'firstName' | 'lastName', value: string) => {
+    setBillingAddress((prev) => ({ ...prev, [field]: value }));
+    if (addressValidated || addressErrors[field]) {
+      setAddressErrors((prev) => {
+        const next = { ...prev };
+        const trimmed = value.trim();
+        if (field === 'firstName') {
+          if (!trimmed) {
+            next.firstName = 'First name is required';
+          } else {
+            delete next.firstName;
+          }
+        } else if (field === 'lastName') {
+          if (!trimmed) {
+            next.lastName = 'Last name is required';
+          } else {
+            delete next.lastName;
+          }
+        }
+        return next;
+      });
+    }
+  };
   const [billingAddress, setBillingAddress] = useState(
     customer?.billing || {
       firstName: '',
@@ -92,6 +117,7 @@ export function CustomerDetailPage() {
   const computedOrdersCount = customer.totalOrders;
 
   const handleSaveAddress = async () => {
+    setAddressValidated(true);
     const errs: Record<string, string> = {};
     if (!billingAddress.firstName?.trim()) {
       errs.firstName = 'First name is required';
@@ -109,6 +135,7 @@ export function CustomerDetailPage() {
     try {
       await updateCustomerAddress(customer.id, billingAddress);
       toast.success('Customer address updated.');
+      setAddressValidated(false);
       setAddressErrors({});
       setEditAddressOpen(false);
     } catch (err) {
@@ -429,10 +456,7 @@ export function CustomerDetailPage() {
                 <label className="font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
                 <Input
                   value={billingAddress.firstName}
-                  onChange={(e) => {
-                    setBillingAddress({ ...billingAddress, firstName: e.target.value });
-                    if (addressErrors.firstName) setAddressErrors((prev) => ({ ...prev, firstName: undefined! }));
-                  }}
+                  onChange={(e) => handleAddressFieldChange('firstName', e.target.value)}
                   className={addressErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
                 {addressErrors.firstName && (
@@ -446,10 +470,7 @@ export function CustomerDetailPage() {
                 <label className="font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
                 <Input
                   value={billingAddress.lastName}
-                  onChange={(e) => {
-                    setBillingAddress({ ...billingAddress, lastName: e.target.value });
-                    if (addressErrors.lastName) setAddressErrors((prev) => ({ ...prev, lastName: undefined! }));
-                  }}
+                  onChange={(e) => handleAddressFieldChange('lastName', e.target.value)}
                   className={addressErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''}
                 />
                 {addressErrors.lastName && (

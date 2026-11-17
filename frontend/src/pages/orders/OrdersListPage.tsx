@@ -55,6 +55,8 @@ export function OrdersListPage() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   // Same rolling window the dashboard uses, so the two can be compared directly.
   const [period, setPeriod] = useState<string>('all');
+  const [customFrom, setCustomFrom] = useState<string>('');
+  const [customTo, setCustomTo] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
@@ -93,7 +95,9 @@ export function OrdersListPage() {
   };
 
   const hasActiveFilters = Boolean(
-    searchTerm.trim() || selectedStatus !== 'all' || period !== 'all'
+    searchTerm.trim() ||
+    selectedStatus !== 'all' ||
+    (period === 'custom' ? Boolean(customFrom || customTo) : period !== 'all')
   );
 
   const activeFilterCount =
@@ -105,6 +109,8 @@ export function OrdersListPage() {
     setSearchTerm('');
     setSelectedStatus('all');
     setPeriod('all');
+    setCustomFrom('');
+    setCustomTo('');
     setCurrentPage(1);
   };
 
@@ -121,6 +127,8 @@ export function OrdersListPage() {
     };
   }, [orders]);
 
+
+
   // Filtered orders
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
@@ -132,12 +140,28 @@ export function OrdersListPage() {
       const matchesStatus =
         selectedStatus === 'all' || o.status === selectedStatus;
 
-      const matchesPeriod =
-        period === 'all' || new Date(o.dateCreated).getTime() >= Date.now() - Number(period) * 86_400_000;
+      let matchesPeriod = true;
+      if (period === 'today') {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        matchesPeriod = new Date(o.dateCreated).getTime() >= startOfToday.getTime();
+      } else if (period === 'custom') {
+        const orderTime = new Date(o.dateCreated).getTime();
+        if (customFrom) {
+          const fromTime = new Date(`${customFrom}T00:00:00`).getTime();
+          if (orderTime < fromTime) matchesPeriod = false;
+        }
+        if (customTo) {
+          const toTime = new Date(`${customTo}T23:59:59.999`).getTime();
+          if (orderTime > toTime) matchesPeriod = false;
+        }
+      } else if (period !== 'all') {
+        matchesPeriod = new Date(o.dateCreated).getTime() >= Date.now() - Number(period) * 86_400_000;
+      }
 
       return matchesSearch && matchesStatus && matchesPeriod;
     });
-  }, [orders, searchTerm, selectedStatus, period]);
+  }, [orders, searchTerm, selectedStatus, period, customFrom, customTo]);
 
   const totalPages = Math.ceil(filteredOrders.length / pageSize);
   const paginatedOrders = filteredOrders.slice(
@@ -247,6 +271,8 @@ export function OrdersListPage() {
           );
         })}
       </div>
+
+
 
       {/* Search & Secondary Filter */}
       <Card>
@@ -360,7 +386,7 @@ export function OrdersListPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-44 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Select
                 value={period}
                 onValueChange={(val) => {
@@ -368,16 +394,46 @@ export function OrdersListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="bg-slate-50/50 flex-1">
+                <SelectTrigger className="bg-slate-50/50 w-36">
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="7">Last 7 days</SelectItem>
                   <SelectItem value="30">Last 30 days</SelectItem>
                   <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="custom">Custom range</SelectItem>
                 </SelectContent>
               </Select>
+
+              {period === 'custom' && (
+                <div className="flex items-center gap-1.5 bg-slate-50/80 p-1 rounded-md border border-slate-200">
+                  <Input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => {
+                      setCustomFrom(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 text-xs w-32 bg-white"
+                    placeholder="Start date"
+                    title="From Date"
+                  />
+                  <span className="text-slate-400 text-xs">to</span>
+                  <Input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => {
+                      setCustomTo(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 text-xs w-32 bg-white"
+                    placeholder="End date"
+                    title="To Date"
+                  />
+                </div>
+              )}
 
               {hasActiveFilters && (
                 <Button
@@ -460,11 +516,42 @@ export function OrdersListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="7">Last 7 days</SelectItem>
                 <SelectItem value="30">Last 30 days</SelectItem>
                 <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="custom">Custom range</SelectItem>
               </SelectContent>
             </Select>
+
+            {period === 'custom' && (
+              <div className="grid grid-cols-2 gap-2 mt-2.5">
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500 block mb-1">From Date</label>
+                  <Input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => {
+                      setCustomFrom(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-9 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500 block mb-1">To Date</label>
+                  <Input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => {
+                      setCustomTo(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="h-9 text-xs"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </FilterModal>

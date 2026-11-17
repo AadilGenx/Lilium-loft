@@ -53,7 +53,7 @@ class OrderController extends Controller
                 ->where('number', 'like', "%{$v}%")
                 ->orWhere('billing_name', 'like', "%{$v}%")
                 ->orWhere('billing_email', 'like', "%{$v}%")))
-            ->when($request->boolean('with_items'), fn ($q) => $q->with('items'))
+            ->when($request->boolean('with_items'), fn ($q) => $q->with('items.product'))
             ->orderBy($request->input('sort', 'woo_created_at'), $request->input('direction', 'desc'));
 
         $page = $q->paginate((int) $request->input('per_page', 20))->withQueryString();
@@ -77,6 +77,6 @@ class OrderController extends Controller
     )]
     public function show(int $id): JsonResponse
     {
-        return response()->json(WooOrder::with('items')->findOrFail($id)->append(WooOrder::DETAIL_ATTRS));
+        return response()->json(WooOrder::with('items.product')->findOrFail($id)->append(WooOrder::DETAIL_ATTRS));
     }
 }

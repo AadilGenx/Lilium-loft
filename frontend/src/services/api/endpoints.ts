@@ -67,13 +67,29 @@ export const authApi = {
 };
 
 // ----------------- Dashboard -----------------
+export interface DashboardDateParams {
+  days?: number | string;
+  date_from?: string;
+  date_to?: string;
+}
+
 export const dashboardApi = {
-  async getSummary(days = 30): Promise<BackendDashboardSummary> {
-    return apiClient<BackendDashboardSummary>(`/dashboard/summary?days=${days}`);
+  async getSummary(params: number | string | DashboardDateParams = 30): Promise<BackendDashboardSummary> {
+    const query = typeof params === 'object'
+      ? new URLSearchParams(
+          Object.entries(params).filter(([_, v]) => v !== undefined && v !== '') as [string, string][]
+        ).toString()
+      : `days=${params}`;
+    return apiClient<BackendDashboardSummary>(`/dashboard/summary?${query}`);
   },
 
-  async getRevenue(days = 30): Promise<BackendRevenuePoint[]> {
-    return apiClient<BackendRevenuePoint[]>(`/dashboard/revenue?days=${days}`);
+  async getRevenue(params: number | string | DashboardDateParams = 30): Promise<BackendRevenuePoint[]> {
+    const query = typeof params === 'object'
+      ? new URLSearchParams(
+          Object.entries(params).filter(([_, v]) => v !== undefined && v !== '') as [string, string][]
+        ).toString()
+      : `days=${params}`;
+    return apiClient<BackendRevenuePoint[]>(`/dashboard/revenue?${query}`);
   },
 
   async getOrdersByStatus(): Promise<Record<string, number>> {

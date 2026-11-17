@@ -8,7 +8,6 @@ import {
   Calendar,
   Trash2,
   Edit2,
-  Download,
   CheckCircle2,
   AlertCircle,
   Copy,
@@ -52,7 +51,6 @@ import { useCouponStore } from '@/store';
 import { Coupon, CouponDiscountType } from '@/types';
 import { couponSchema, CouponFormValues } from '@/schemas';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { exportToCSV } from '@/utils/csv';
 import { getErrorMessage } from '@/utils/errors';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import { toast } from 'sonner';
@@ -91,6 +89,7 @@ export function CouponsListPage() {
     formState: { errors },
   } = useForm<CouponFormValues>({
     resolver: zodResolver(couponSchema),
+    mode: 'onChange',
     defaultValues: {
       code: '',
       discountType: 'percent',
@@ -178,21 +177,6 @@ export function CouponsListPage() {
     return matchesSearch && matchesType;
   });
 
-  const handleExport = () => {
-    exportToCSV(
-      coupons.map((c) => ({
-        Code: c.code,
-        Type: c.discountType,
-        Amount: c.amount,
-        UsageCount: c.usageCount,
-        UsageLimit: c.usageLimit || 'Unlimited',
-        ExpiryDate: c.expiryDate || 'Never',
-        Status: c.status,
-      })),
-      'woocommerce-coupons'
-    );
-  };
-
   const formatDiscount = (type: CouponDiscountType, amount: number) => {
     if (type === 'percent') return `${amount}% Off`;
     return `${formatCurrency(amount)} Off`;
@@ -211,15 +195,6 @@ export function CouponsListPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
           <Button
             onClick={openCreateModal}
             size="sm"

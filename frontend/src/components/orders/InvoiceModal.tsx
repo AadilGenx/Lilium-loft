@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Printer, Download, FileText, Loader2 } from 'lucide-react';
 import { Order } from '@/types';
 import { formatCurrency } from '@/utils/formatters';
+import { useProductStore } from '@/store';
 import {
   getInvoiceNumber,
   formatInvoiceDate,
@@ -71,7 +72,7 @@ export function InvoiceModal({ order, open, onOpenChange }: InvoiceModalProps) {
     try {
       setIsDownloading(true);
       toast.loading('Downloading invoice PDF...', { id: 'invoice-pdf-download' });
-      await downloadInvoicePDF(order, invoiceRef.current);
+      await downloadInvoicePDF(order);
       toast.success('Invoice PDF downloaded successfully!', { id: 'invoice-pdf-download' });
     } catch (err) {
       console.error('Download PDF error:', err);
@@ -226,16 +227,36 @@ export function InvoiceModal({ order, open, onOpenChange }: InvoiceModalProps) {
                     const itemPrice =
                       item.price || (item.quantity > 0 ? item.total / item.quantity : 0);
                     const itemTotal = item.total || itemPrice * item.quantity;
+                    const products = useProductStore.getState().products;
+                    const product = products.find(
+                      (p) =>
+                        (item.productId && (String(p.id) === String(item.productId) || String(p.wooId) === String(item.productId))) ||
+                        (item.sku && p.sku && String(p.sku).trim() === String(item.sku).trim()) ||
+                        (item.name && p.name && p.name.trim().toLowerCase() === item.name.trim().toLowerCase())
+                    );
+                    const itemImage =
+                      item.image ||
+                      product?.images?.[0]?.src ||
+                      (product as any)?.image_url ||
+                      (product as any)?.imageUrl;
                     return (
                       <tr key={item.id || idx} className="text-slate-700">
                         <td className="py-3 px-2 text-slate-500">{idx + 1}</td>
                         <td className="py-3 px-2">
                           <div className="h-11 w-11 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center">
-                            {item.image ? (
+                            {itemImage ? (
                               <img
-                                src={item.image}
+                                src={itemImage}
                                 alt={item.name}
                                 className="h-full w-full object-cover"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const target = e.currentTarget;
+                                  target.style.display = 'none';
+                                  if (target.parentElement) {
+                                    target.parentElement.innerHTML = '<span class="text-slate-400 text-sm">🧶</span>';
+                                  }
+                                }}
                               />
                             ) : (
                               <span className="text-slate-400 text-sm">🧶</span>

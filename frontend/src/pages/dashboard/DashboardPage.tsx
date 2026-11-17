@@ -10,13 +10,13 @@ import {
   ArrowUpRight,
   AlertTriangle,
   Calendar,
-  Download,
   Clock,
   CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -26,7 +26,6 @@ import {
 } from '@/components/ui/select';
 import { useProductStore, useOrderStore, useCustomerStore, useBackendSyncStore } from '@/store';
 import { formatCurrency, formatDate, formatNumber } from '@/utils/formatters';
-import { exportToCSV } from '@/utils/csv';
 import { useStockState } from '@/hooks/useStockState';
 import { useCurrencyLabel } from '@/hooks/useCurrencySymbol';
 import {
@@ -58,6 +57,9 @@ export function DashboardPage() {
   const orders = useOrderStore((s) => s.orders);
   const customers = useCustomerStore((s) => s.customers);
   const { summary, revenueHistory, topProducts: backendTopProducts, dashboardDays, refreshDashboard } = useBackendSyncStore();
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(String(dashboardDays));
+  const [customFrom, setCustomFrom] = useState<string>('');
+  const [customTo, setCustomTo] = useState<string>('');
 
   // Everything here comes from the backend dashboard endpoints; with no data it simply shows zeros / empty states.
   const totalRevenue = summary?.revenue ?? 0;
@@ -108,21 +110,6 @@ export function DashboardPage() {
     [backendTopProducts]
   );
 
-  const handleExportSummary = () => {
-    exportToCSV(
-      orders.map((o) => ({
-        OrderNumber: o.orderNumber,
-        Customer: o.customerName,
-        Status: o.status,
-        Date: o.dateCreated,
-        Total: o.total,
-        Currency: o.currency,
-        PaymentMethod: o.paymentMethodTitle,
-      })),
-      'woocommerce-sales-summary'
-    );
-  };
-
   const getOrderStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -156,31 +143,63 @@ export function DashboardPage() {
             Sales, orders and stock from your WooCommerce store.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Select
-            value={String(dashboardDays)}
-            onValueChange={(v) => refreshDashboard(Number(v))}
+            value={selectedPeriod}
+            onValueChange={(v) => {
+              setSelectedPeriod(v);
+              if (v !== 'custom') {
+                refreshDashboard(Number(v));
+              }
+            }}
           >
-            <SelectTrigger className="flex-1 sm:w-36 bg-white">
+            <SelectTrigger className="w-full sm:w-36 bg-white">
               <Calendar className="h-4 w-4 mr-2 text-slate-400" />
               <SelectValue placeholder="Period" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="1">Today</SelectItem>
               <SelectItem value="7">Last 7 Days</SelectItem>
               <SelectItem value="30">Last 30 Days</SelectItem>
               <SelectItem value="90">Last 90 Days</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
 
-          <Button
-            onClick={handleExportSummary}
-            variant="outline"
-            size="sm"
-            className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
+          {selectedPeriod === 'custom' && (
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 w-full sm:w-auto bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 text-xs w-full sm:w-36 border-slate-200 bg-slate-50/50"
+                placeholder="Start Date"
+                title="Start Date"
+              />
+              <span className="text-slate-400 text-xs px-0.5">to</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 text-xs w-full sm:w-36 border-slate-200 bg-slate-50/50"
+                placeholder="End Date"
+                title="End Date"
+              />
+              <Button
+                size="sm"
+                variant="default"
+                disabled={!customFrom}
+                onClick={() => {
+                  if (customFrom) {
+                    refreshDashboard({ date_from: customFrom, date_to: customTo || customFrom });
+                  }
+                }}
+                className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white shrink-0"
+              >
+                Apply
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -7,8 +7,8 @@ const optionalNumber = z.preprocess(
 );
 
 export const productSchema = z.object({
-  name: z.string().min(2, 'Product name is required'),
-  slug: z.string().regex(/^[a-z0-9-]*$/, 'Use lowercase letters, numbers and dashes').default(''),
+  name: z.string().trim().min(1, 'Product name is required'),
+  slug: z.string().trim().min(1, 'URL slug is required').regex(/^[a-z0-9-]*$/, 'Use lowercase letters, numbers and dashes').default(''),
   sku: z.string().default(''),
   type: z.enum(['simple', 'variable', 'grouped', 'external']),
   status: z.enum(['publish', 'draft', 'pending', 'private']),
@@ -25,9 +25,12 @@ export const productSchema = z.object({
 export type ProductFormValues = z.infer<typeof productSchema>;
 
 export const couponSchema = z.object({
-  code: z.string().min(3, 'Code must be at least 3 characters').toUpperCase(),
+  code: z.string().trim().min(1, 'Coupon code is required').toUpperCase(),
   discountType: z.enum(['percent', 'fixed_cart', 'fixed_product']),
-  amount: z.coerce.number().gt(0, 'Amount must be greater than 0'),
+  amount: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || Number.isNaN(v) ? undefined : Number(v)),
+    z.number({ required_error: 'Coupon amount is required', invalid_type_error: 'Coupon amount is required' }).gt(0, 'Amount must be greater than 0')
+  ),
   description: z.string().default(''),
   expiryDate: z.string().optional(),
   usageLimit: z.coerce.number().optional(),

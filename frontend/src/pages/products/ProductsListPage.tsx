@@ -8,7 +8,6 @@ import {
   Edit,
   Trash2,
   Eye,
-  Download,
   AlertCircle,
   Package,
   Layers,
@@ -49,7 +48,6 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useProductStore } from '@/store';
 import { Product } from '@/types';
 import { formatCurrency, formatMoney } from '@/utils/formatters';
-import { exportToCSV } from '@/utils/csv';
 import { isOnSale } from '@/utils/stock';
 import { ProductStatusBadge } from '@/components/products/ProductStatusBadge';
 import { useStockState } from '@/hooks/useStockState';
@@ -140,23 +138,6 @@ export function ProductsListPage() {
     }
   };
 
-  const handleExport = () => {
-    exportToCSV(
-      products.map((p) => ({
-        ID: p.id,
-        Name: p.name,
-        SKU: p.sku,
-        Type: p.type,
-        Price: p.price ?? '',
-        StockQuantity: p.manageStock ? p.stockQuantity : '',
-        StockStatus: p.stockStatus,
-        Categories: p.categories.join('; '),
-        Status: p.status,
-      })),
-      'woocommerce-products'
-    );
-  };
-
   const getStockBadge = (prod: Product) => {
     const state = stockOf(prod);
     if (state === 'out') {
@@ -192,15 +173,6 @@ export function ProductsListPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            className="flex-1 sm:flex-none gap-1.5 bg-white"
-          >
-            <Download className="h-4 w-4 text-slate-500" />
-            <span>Export</span>
-          </Button>
           <Button
             onClick={() => navigate('/products/new')}
             size="sm"

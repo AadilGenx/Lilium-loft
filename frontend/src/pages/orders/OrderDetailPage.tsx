@@ -36,7 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useOrderStore, useCustomerStore } from '@/store';
+import { useOrderStore, useCustomerStore, useProductStore } from '@/store';
 import { OrderStatus } from '@/types';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
 import { getErrorMessage } from '@/utils/errors';
@@ -248,20 +248,34 @@ export function OrderDetailPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-slate-100">
-                {order.items.map((item) => (
-                  <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
-                        {item.image ? (
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <ShoppingCart className="h-5 w-5 m-3.5 text-slate-400" />
-                        )}
-                      </div>
+                {order.items.map((item) => {
+                  const products = useProductStore.getState().products;
+                  const product = products.find(
+                    (p) =>
+                      (item.productId && (String(p.id) === String(item.productId) || String(p.wooId) === String(item.productId))) ||
+                      (item.sku && p.sku && String(p.sku).trim() === String(item.sku).trim()) ||
+                      (item.name && p.name && p.name.trim().toLowerCase() === item.name.trim().toLowerCase())
+                  );
+                  const itemImage =
+                    item.image ||
+                    product?.images?.[0]?.src ||
+                    (product as any)?.image_url ||
+                    (product as any)?.imageUrl;
+                  return (
+                    <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
+                          {itemImage ? (
+                            <img
+                              src={itemImage}
+                              alt={item.name}
+                              className="h-full w-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <ShoppingCart className="h-5 w-5 m-3.5 text-slate-400" />
+                          )}
+                        </div>
                       <div>
                         <div className="font-semibold text-slate-800 text-sm">
                           {item.name}
@@ -290,7 +304,8 @@ export function OrderDetailPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
 
               {/* Totals Breakdown: only amounts WooCommerce reports for this order */}

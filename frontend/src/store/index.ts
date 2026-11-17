@@ -24,6 +24,7 @@ import {
   categoriesApi,
   couponsApi,
   dashboardApi,
+  DashboardDateParams,
   shippingApi,
   paymentsApi,
   settingsApi,
@@ -751,8 +752,8 @@ export interface BackendSyncState {
   /** The period (in days) the dashboard numbers cover. */
   dashboardDays: number;
   syncAll: () => Promise<boolean>;
-  /** Reloads only the dashboard numbers (summary, chart, top products); `days` changes the period they cover. */
-  refreshDashboard: (days?: number) => Promise<void>;
+  /** Reloads only the dashboard numbers (summary, chart, top products); accepts days or custom date range params. */
+  refreshDashboard: (params?: number | string | DashboardDateParams) => Promise<void>;
   /** Pulls everything from WooCommerce into the backend database, then reloads every screen from it. */
   importFromStore: () => Promise<StoreImportResult>;
   login: (email: string, password: string) => Promise<boolean>;
@@ -817,13 +818,15 @@ export const useBackendSyncStore = create<BackendSyncState>((set, get) => ({
     });
   },
 
-  refreshDashboard: async (days) => {
-    if (days !== undefined) set({ dashboardDays: days });
-    const period = days ?? get().dashboardDays;
+  refreshDashboard: async (params) => {
+    let queryParam: number | string | DashboardDateParams = params ?? get().dashboardDays;
+    if (typeof params === 'number') {
+      set({ dashboardDays: params });
+    }
     try {
       const [summary, revenueHistory, ordersByStatus, topProducts] = await Promise.all([
-        dashboardApi.getSummary(period),
-        dashboardApi.getRevenue(period),
+        dashboardApi.getSummary(queryParam),
+        dashboardApi.getRevenue(queryParam),
         dashboardApi.getOrdersByStatus(),
         dashboardApi.getTopProducts(),
       ]);

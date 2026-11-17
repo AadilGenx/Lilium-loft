@@ -10,6 +10,7 @@ import {
   UserRound,
   Save,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -287,6 +288,30 @@ export function SettingsPage() {
             );
           })}
       </Tabs>
+
+      {/* Floating Save Button */}
+      {activeTab !== STORE_CHANGES && (() => {
+        const activeGroup = tabs.find((t) => t.id === activeTab);
+        const rows = (settings[activeTab] ?? []).filter(isEditable);
+        if (!activeGroup) return null;
+        return (
+          <div className="fixed bottom-6 right-6 z-40 animate-in fade-in slide-in-from-bottom-3 duration-200">
+            <Button
+              size="default"
+              onClick={() => handleSave(activeGroup.id)}
+              disabled={saving || rows.length === 0}
+              className="gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs sm:text-sm px-5 py-3 rounded-full shadow-2xl shadow-red-900/40 hover:scale-105 active:scale-95 transition-all flex items-center border border-red-500/30"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              <span>Save {htmlToText(activeGroup.label)}</span>
+            </Button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

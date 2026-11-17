@@ -127,6 +127,7 @@ export function mapBackendOrder(o: BackendOrder): Order {
       quantity: item.quantity,
       subtotal: lineSubtotal,
       total: lineTotal,
+      image: item.image_url ?? undefined,
     };
   });
 

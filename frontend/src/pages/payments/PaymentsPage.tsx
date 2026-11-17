@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   RotateCcw,
   ArrowUpRight,
-  Download,
   ExternalLink,
   AlertCircle,
 } from 'lucide-react';
@@ -37,7 +36,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { usePaymentStore, useOrderStore } from '@/store';
 import { PaymentGateway, Transaction } from '@/types';
 import { formatCurrency, formatDateTime } from '@/utils/formatters';
-import { exportToCSV } from '@/utils/csv';
 import { getErrorMessage } from '@/utils/errors';
 import { toast } from 'sonner';
 
@@ -127,24 +125,6 @@ export function PaymentsPage() {
     }
   };
 
-  const handleExportTransactions = () => {
-    exportToCSV(
-      transactions.map((t) => ({
-        ID: t.id,
-        Order: t.orderNumber,
-        Customer: t.customerName,
-        Amount: t.amount,
-        Currency: t.currency,
-        Status: t.status,
-        Method: t.paymentMethod,
-        Date: t.date,
-        Reference: t.transactionReference,
-      })),
-      'woocommerce-payment-transactions'
-    );
-    toast.success('Transactions exported to CSV.');
-  };
-
   const getStatusBadge = (status: Transaction['status']) => {
     switch (status) {
       case 'completed':
@@ -173,17 +153,7 @@ export function PaymentsPage() {
           </p>
         </div>
 
-        {activeTab === 'transactions' && (
-          <Button
-            onClick={handleExportTransactions}
-            variant="outline"
-            size="sm"
-            className="gap-1.5 bg-white text-slate-700 self-start sm:self-auto"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button>
-        )}
+
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
