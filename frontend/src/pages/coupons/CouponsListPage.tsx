@@ -218,7 +218,7 @@ export function CouponsListPage() {
             className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
           >
             <Download className="h-4 w-4" />
-            <span>Export CSV</span>
+            <span>Export</span>
           </Button>
           <Button
             onClick={openCreateModal}

@@ -67,7 +67,7 @@ export function ProductsListPage() {
   const [selectedType, setSelectedType] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const pageSize = 8;
+  const pageSize = 10;
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
@@ -199,7 +199,7 @@ export function ProductsListPage() {
             className="flex-1 sm:flex-none gap-1.5 bg-white"
           >
             <Download className="h-4 w-4 text-slate-500" />
-            <span>Export CSV</span>
+            <span>Export</span>
           </Button>
           <Button
             onClick={() => navigate('/products/new')}

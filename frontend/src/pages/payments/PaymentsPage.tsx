@@ -181,7 +181,7 @@ export function PaymentsPage() {
             className="gap-1.5 bg-white text-slate-700 self-start sm:self-auto"
           >
             <Download className="h-4 w-4" />
-            <span>Export Transactions</span>
+            <span>Export</span>
           </Button>
         )}
       </div>

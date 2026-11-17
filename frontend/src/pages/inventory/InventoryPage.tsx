@@ -74,7 +74,7 @@ export function InventoryPage() {
   }, [filterParam]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const pageSize = 8;
+  const pageSize = 10;
 
   const hasActiveFilters = Boolean(searchTerm.trim() || filterTab !== 'all');
   const activeFilterCount = (filterTab !== 'all' ? 1 : 0) + (searchTerm.trim() ? 1 : 0);
@@ -193,7 +193,7 @@ export function InventoryPage() {
             className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
           >
             <Download className="h-4 w-4" />
-            <span>Export Inventory Report</span>
+            <span>Export</span>
           </Button>
         </div>
       </div>

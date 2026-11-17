@@ -13,12 +13,14 @@ import {
   CheckCircle2,
   Calendar,
   ExternalLink,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { InvoiceModal } from '@/components/orders/InvoiceModal';
 import {
   Select,
   SelectContent,
@@ -66,6 +68,7 @@ export function OrderDetailPage() {
 
   // Refund Modal State
   const [refundModalOpen, setRefundModalOpen] = useState(false);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState<number>(0);
   const [refundReason, setRefundReason] = useState('');
   const [refundErrors, setRefundErrors] = useState<{ amount?: string; reason?: string }>({});
@@ -205,6 +208,16 @@ export function OrderDetailPage() {
               </SelectContent>
             </Select>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInvoiceModalOpen(true)}
+            className="gap-1.5 bg-white text-slate-700 border-slate-200 hover:border-red-300 hover:text-red-700 shrink-0"
+          >
+            <FileText className="h-4 w-4 text-red-600" />
+            <span>Invoice</span>
+          </Button>
 
           {remainingRefundable > 0 && order.status !== 'cancelled' && (
             <Button
@@ -641,6 +654,12 @@ export function OrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Official Lilium & Loft Tax Invoice Modal */}
+      <InvoiceModal
+        order={order}
+        open={invoiceModalOpen}
+        onOpenChange={setInvoiceModalOpen}
+      />
     </div>
   );
 }

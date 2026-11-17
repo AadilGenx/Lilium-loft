@@ -6,6 +6,7 @@ import {
   Filter,
   Download,
   Eye,
+  Printer,
   CheckCircle,
   Clock,
   AlertTriangle,
@@ -13,12 +14,17 @@ import {
   XCircle,
   ChevronRight,
   X,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { FilterModal } from '@/components/ui/filter-modal';
+import { InvoiceModal } from '@/components/orders/InvoiceModal';
+import { printInvoice, downloadInvoicePDF } from '@/utils/invoice';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -51,7 +57,40 @@ export function OrdersListPage() {
   const [period, setPeriod] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const pageSize = 8;
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [downloadingOrderId, setDownloadingOrderId] = useState<string | number | null>(null);
+  const pageSize = 10;
+
+  const handleOpenInvoice = (order: Order, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedInvoiceOrder(order);
+    setInvoiceModalOpen(true);
+  };
+
+  const handleDirectPrint = (order: Order, e: React.MouseEvent) => {
+    e.stopPropagation();
+    printInvoice(order);
+  };
+
+  const handleDirectDownload = async (order: Order, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setDownloadingOrderId(order.id);
+      toast.loading(`Downloading Invoice for order #${order.orderNumber}...`, {
+        id: `download-${order.id}`,
+      });
+      await downloadInvoicePDF(order);
+      toast.success(`Invoice for order #${order.orderNumber} downloaded!`, {
+        id: `download-${order.id}`,
+      });
+    } catch (err) {
+      console.error('Failed to download invoice:', err);
+      toast.error('Failed to download invoice PDF', { id: `download-${order.id}` });
+    } finally {
+      setDownloadingOrderId(null);
+    }
+  };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() || selectedStatus !== 'all' || period !== 'all'
@@ -99,18 +138,6 @@ export function OrdersListPage() {
       return matchesSearch && matchesStatus && matchesPeriod;
     });
   }, [orders, searchTerm, selectedStatus, period]);
-
-  // What the list adds up to, and how much of it the dashboard counts as sales
-  // (processing + completed orders, after refunds). Only shown when every order is in one currency.
-  const totals = useMemo(() => {
-    const currencies = new Set(filteredOrders.map((o) => o.currency));
-    if (filteredOrders.length === 0 || currencies.size !== 1) return null;
-    const listed = filteredOrders.reduce((sum, o) => sum + o.total, 0);
-    const counted = filteredOrders
-      .filter((o) => o.status === 'processing' || o.status === 'completed')
-      .reduce((sum, o) => sum + o.total - o.refundedTotal, 0);
-    return { currency: filteredOrders[0].currency, listed, counted };
-  }, [filteredOrders]);
 
   const totalPages = Math.ceil(filteredOrders.length / pageSize);
   const paginatedOrders = filteredOrders.slice(
@@ -178,7 +205,7 @@ export function OrdersListPage() {
             className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
           >
             <Download className="h-4 w-4" />
-            <span>Export Orders</span>
+            <span>Export</span>
           </Button>
         </div>
       </div>
@@ -442,25 +469,6 @@ export function OrdersListPage() {
         </div>
       </FilterModal>
 
-      {/* What the current list adds up to */}
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-1 text-xs text-slate-500">
-        <span>
-          <strong className="text-slate-800">{filteredOrders.length}</strong>{' '}
-          {filteredOrders.length === 1 ? 'order' : 'orders'}
-          {totals && (
-            <>
-              {' '}· total <strong className="text-slate-800">{formatCurrency(totals.listed, totals.currency)}</strong>
-            </>
-          )}
-        </span>
-        {totals && (
-          <span>
-            Counted as sales (processing + completed, after refunds):{' '}
-            <strong className="text-slate-800">{formatCurrency(totals.counted, totals.currency)}</strong>
-          </span>
-        )}
-      </div>
-
       {/* Orders Table */}
       <Card>
         <CardContent className="p-0">
@@ -516,9 +524,49 @@ export function OrdersListPage() {
                       <span className="text-slate-400">
                         Payment: <span className="text-slate-700 font-medium">{order.paymentMethodTitle || 'Standard'}</span>
                       </span>
-                      <span className="flex items-center gap-0.5 text-red-600 font-medium">
-                        Details <ChevronRight className="h-3 w-3" />
-                      </span>
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => handleOpenInvoice(order, e)}
+                          className="h-7 w-7 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300"
+                          title="View Invoice"
+                          aria-label="View Invoice"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => handleDirectPrint(order, e)}
+                          className="h-7 w-7 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300"
+                          title="Print Invoice"
+                          aria-label="Print Invoice"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => handleDirectDownload(order, e)}
+                          disabled={downloadingOrderId === order.id}
+                          className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
+                          title="Download PDF"
+                          aria-label="Download PDF"
+                        >
+                          {downloadingOrderId === order.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        <span
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                          className="flex items-center gap-0.5 text-red-600 font-medium ml-1 cursor-pointer"
+                        >
+                          Details <ChevronRight className="h-3 w-3" />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -536,7 +584,7 @@ export function OrdersListPage() {
                       <TableHead>Items</TableHead>
                       <TableHead>Payment Method</TableHead>
                       <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="w-12 text-right"></TableHead>
+                      <TableHead className="text-center w-36">Invoice</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -571,8 +619,44 @@ export function OrdersListPage() {
                         <TableCell className="text-right font-bold text-slate-900">
                           {formatCurrency(order.total, order.currency)}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <ChevronRight className="h-4 w-4 text-slate-400 inline" />
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={(e) => handleOpenInvoice(order, e)}
+                              className="h-7 w-7 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300"
+                              title="View Invoice"
+                              aria-label="View Invoice"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={(e) => handleDirectPrint(order, e)}
+                              className="h-7 w-7 text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-300"
+                              title="Print Invoice"
+                              aria-label="Print Invoice"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={(e) => handleDirectDownload(order, e)}
+                              disabled={downloadingOrderId === order.id}
+                              className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
+                              title="Direct Download PDF"
+                              aria-label="Download PDF"
+                            >
+                              {downloadingOrderId === order.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -591,6 +675,13 @@ export function OrdersListPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Official Lilium & Loft Tax Invoice Modal */}
+      <InvoiceModal
+        order={selectedInvoiceOrder}
+        open={invoiceModalOpen}
+        onOpenChange={setInvoiceModalOpen}
+      />
     </div>
   );
 }

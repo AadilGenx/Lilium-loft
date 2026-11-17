@@ -62,7 +62,7 @@ export function CustomersListPage() {
   const [filterActivity, setFilterActivity] = useState<'all' | 'with-orders' | 'no-orders'>('all');
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  const pageSize = 10;
 
   const hasActiveFilters = Boolean(searchTerm.trim() || filterActivity !== 'all');
   const activeFilterCount = (filterActivity !== 'all' ? 1 : 0) + (searchTerm.trim() ? 1 : 0);
@@ -201,7 +201,7 @@ export function CustomersListPage() {
             className="flex-1 sm:flex-none gap-1.5 bg-white text-slate-700"
           >
             <Download className="h-4 w-4" />
-            <span>Export CSV</span>
+            <span>Export</span>
           </Button>
           <Button
             onClick={() => setAddModalOpen(true)}
